@@ -59,6 +59,43 @@ export async function probeGatewayReady(
   });
 }
 
+export async function waitForGatewayReady(options: {
+  port: number;
+  getProcessExitCode: () => number | null;
+  retries?: number;
+  intervalMs?: number;
+}): Promise<void> {
+  const retries = options.retries ?? 2400;
+  const intervalMs = options.intervalMs ?? 200;
+
+  for (let i = 0; i < retries; i++) {
+    const exitCode = options.getProcessExitCode();
+    if (exitCode !== null) {
+      logger.error(`Gateway process exited before ready (code=${exitCode})`);
+      throw new Error(`Gateway process exited before becoming ready (code=${exitCode})`);
+    }
+
+    try {
+      const ready = await probeGatewayReady(options.port, 1500);
+      if (ready) {
+        logger.debug(`Gateway ready after ${i + 1} attempt(s)`);
+        return;
+      }
+    } catch {
+      // Gateway not ready yet.
+    }
+
+    if (i > 0 && i % 10 === 0) {
+      logger.debug(`Still waiting for Gateway... (attempt ${i + 1}/${retries})`);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  logger.error(`Gateway failed to become ready after ${retries} attempts on port ${options.port}`);
+  throw new Error(`Gateway failed to start after ${retries} retries (port ${options.port})`);
+}
+
 export function buildGatewayConnectFrame(options: {
   challengeNonce: string;
   token: string;
