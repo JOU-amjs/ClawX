@@ -111,23 +111,6 @@ function handleGatewayChatMessage(data: unknown): void {
   }).catch(() => {});
 }
 
-function handleGatewayMessage(data: unknown): void {
-  if (!data || typeof data !== 'object') return;
-  const msg = data as Record<string, unknown>;
-  if (msg.state && msg.message) {
-    import('./chat').then(({ useChatStore }) => {
-      useChatStore.getState().handleChatEvent(msg);
-    }).catch(() => {});
-  } else if (msg.role && msg.content) {
-    import('./chat').then(({ useChatStore }) => {
-      useChatStore.getState().handleChatEvent({
-        state: 'final',
-        message: msg,
-      });
-    }).catch(() => {});
-  }
-}
-
 function mapChannelStatus(status: string): 'connected' | 'connecting' | 'disconnected' | 'error' {
   switch (status) {
     case 'connected':
