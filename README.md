@@ -15,7 +15,8 @@
   <a href="#getting-started">Getting Started</a> •
   <a href="#architecture">Architecture</a> •
   <a href="#development">Development</a> •
-  <a href="#contributing">Contributing</a>
+  <a href="#contributing">Contributing</a> •
+  <a href="#affiliate-program">Affiliate Program</a>
 </p>
 
 <p align="center">
@@ -342,6 +343,28 @@ We welcome contributions from the community! Whether it's bug fixes, new feature
 - Write tests for new functionality
 - Update documentation as needed
 - Keep commits atomic and descriptive
+
+---
+
+## Affiliate Program
+
+We're launching the ClawX Affiliate Program and inviting creators, developers, and communities to help grow the ClawX ecosystem.
+
+If you run an AI, tech, or developer community, or regularly share AI tools, we'd love to collaborate.
+
+Affiliate partners will receive:
+
+- Affiliate commissions
+- Early access to new features
+- Support from the ClawX team
+
+We're also open to discussing additional collaboration opportunities.
+
+Interested? Send us a DM in the community or email `public@valuecell.ai`, and briefly introduce your platform or community.
+
+Let's bring AI agents from the terminal to everyone's desktop.
+
+— ClawX Team 🚀
 
 ---
 
