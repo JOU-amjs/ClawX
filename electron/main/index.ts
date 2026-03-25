@@ -299,7 +299,7 @@ async function initialize(): Promise<void> {
   // Register IPC handlers
   registerIpcHandlers(gatewayManager, clawHubService, window);
 
-  hostApiServer = startHostApiServer({
+  hostApiServer = await startHostApiServer({
     gatewayManager,
     clawHubService,
     eventBus: hostEventBus,

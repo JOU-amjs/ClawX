@@ -38,10 +38,50 @@ const routeHandlers: RouteHandler[] = [
   handleUsageRoutes,
 ];
 
-export function startHostApiServer(ctx: HostApiContext, port = PORTS.CLAWX_HOST_API): Server {
+/** Maximum number of alternative ports to try when the default port is unavailable. */
+const MAX_PORT_RETRIES = 5;
+
+/**
+ * The port that the Host API server is actually listening on.
+ * This may differ from the configured default if the default port was unavailable.
+ * Returns `null` if no server has been started or all ports failed.
+ */
+let actualPort: number | null = null;
+
+export function getHostApiPort(): number | null {
+  return actualPort;
+}
+
+/**
+ * Try to start an HTTP server on the given port.
+ * Returns a promise that resolves with the server on success,
+ * or rejects on binding error (EACCES, EADDRINUSE, etc.).
+ */
+function tryListen(server: Server, port: number, host: string): Promise<Server> {
+  return new Promise<Server>((resolve, reject) => {
+    const onError = (error: NodeJS.ErrnoException) => {
+      server.removeListener('listening', onListening);
+      reject(error);
+    };
+    const onListening = () => {
+      server.removeListener('error', onError);
+      resolve(server);
+    };
+    server.once('error', onError);
+    server.once('listening', onListening);
+    server.listen(port, host);
+  });
+}
+
+export async function startHostApiServer(
+  ctx: HostApiContext,
+  preferredPort = PORTS.CLAWX_HOST_API,
+): Promise<Server> {
+  const host = '127.0.0.1';
+
   const server = createServer(async (req, res) => {
     try {
-      const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${port}`);
+      const requestUrl = new URL(req.url || '/', `http://${host}:${actualPort ?? preferredPort}`);
       for (const handler of routeHandlers) {
         if (await handler(req, res, requestUrl, ctx)) {
           return;
@@ -54,9 +94,44 @@ export function startHostApiServer(ctx: HostApiContext, port = PORTS.CLAWX_HOST_
     }
   });
 
-  server.listen(port, '127.0.0.1', () => {
-    logger.info(`Host API server listening on http://127.0.0.1:${port}`);
+  // Attach a persistent error handler so any later runtime errors
+  // (e.g. connection resets) are logged instead of crashing the process.
+  server.on('error', (error) => {
+    logger.error('Host API server error:', error);
   });
 
+  // Try the preferred port first, then fall back to adjacent ports.
+  for (let attempt = 0; attempt <= MAX_PORT_RETRIES; attempt++) {
+    const port = preferredPort + attempt;
+    try {
+      await tryListen(server, port, host);
+      actualPort = port;
+      if (attempt > 0) {
+        logger.warn(
+          `Host API: default port ${preferredPort} was unavailable; ` +
+          `listening on fallback port ${port} instead`,
+        );
+      }
+      logger.info(`Host API server listening on http://${host}:${port}`);
+      return server;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'EACCES' || code === 'EADDRINUSE') {
+        logger.warn(`Host API: port ${port} unavailable (${code}), trying next port...`);
+        continue;
+      }
+      // Unexpected error — don't retry, just log and break.
+      logger.error(`Host API: unexpected error binding port ${port}:`, error);
+      break;
+    }
+  }
+
+  // All ports failed — log a clear warning but DON'T crash the app.
+  logger.error(
+    `Host API server failed to bind to any port ` +
+    `(tried ${preferredPort}–${preferredPort + MAX_PORT_RETRIES}). ` +
+    `UI features that depend on the Host API will be unavailable.`,
+  );
+  actualPort = null;
   return server;
 }

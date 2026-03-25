@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { proxyAwareFetch } from '../../utils/proxy-fetch';
+import { getHostApiPort } from '../../api/server';
 import { PORTS } from '../../utils/config';
 
 type HostApiFetchRequest = {
@@ -10,8 +11,19 @@ type HostApiFetchRequest = {
 };
 
 export function registerHostApiProxyHandlers(): void {
+  // Allow the renderer to discover the actual Host API port
+  // (may differ from the configured default if a fallback port was used).
+  ipcMain.handle('hostapi:port', () => {
+    return getHostApiPort() ?? PORTS.CLAWX_HOST_API;
+  });
+
   ipcMain.handle('hostapi:fetch', async (_, request: HostApiFetchRequest) => {
     try {
+      const port = getHostApiPort();
+      if (port == null) {
+        throw new Error('Host API server is not available');
+      }
+
       const path = typeof request?.path === 'string' ? request.path : '';
       if (!path || !path.startsWith('/')) {
         throw new Error(`Invalid host API path: ${String(request?.path)}`);
@@ -32,7 +44,7 @@ export function registerHostApiProxyHandlers(): void {
         }
       }
 
-      const response = await proxyAwareFetch(`http://127.0.0.1:${PORTS.CLAWX_HOST_API}${path}`, {
+      const response = await proxyAwareFetch(`http://127.0.0.1:${port}${path}`, {
         method,
         headers,
         body,

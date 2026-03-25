@@ -1,6 +1,7 @@
 import { createHostEventSource } from './host-api';
 
 let eventSource: EventSource | null = null;
+let eventSourcePromise: Promise<EventSource> | null = null;
 
 const HOST_EVENT_TO_IPC_CHANNEL: Record<string, string> = {
   'gateway:status': 'gateway:status-changed',
@@ -20,11 +21,15 @@ const HOST_EVENT_TO_IPC_CHANNEL: Record<string, string> = {
   'channel:wechat-error': 'channel:wechat-error',
 };
 
-function getEventSource(): EventSource {
-  if (!eventSource) {
-    eventSource = createHostEventSource();
+function getEventSource(): Promise<EventSource> {
+  if (eventSource) return Promise.resolve(eventSource);
+  if (!eventSourcePromise) {
+    eventSourcePromise = createHostEventSource().then((source) => {
+      eventSource = source;
+      return source;
+    });
   }
-  return eventSource;
+  return eventSourcePromise;
 }
 
 function allowSseFallback(): boolean {
@@ -56,13 +61,20 @@ export function subscribeHostEvent<T = unknown>(
     return () => {};
   }
 
-  const source = getEventSource();
   const listener = (event: Event) => {
     const payload = JSON.parse((event as MessageEvent).data) as T;
     handler(payload);
   };
-  source.addEventListener(eventName, listener);
+  let unsubscribed = false;
+  void getEventSource().then((source) => {
+    if (unsubscribed) return;
+    source.addEventListener(eventName, listener);
+  });
   return () => {
-    source.removeEventListener(eventName, listener);
+    unsubscribed = true;
+    // If the EventSource was already resolved, remove the listener immediately.
+    if (eventSource) {
+      eventSource.removeEventListener(eventName, listener);
+    }
   };
 }

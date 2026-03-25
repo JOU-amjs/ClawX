@@ -2,8 +2,28 @@ import { invokeIpc } from '@/lib/api-client';
 import { trackUiEvent } from './telemetry';
 import { normalizeAppError } from './error-model';
 
-const HOST_API_PORT = 3210;
-const HOST_API_BASE = `http://127.0.0.1:${HOST_API_PORT}`;
+const DEFAULT_HOST_API_PORT = 3210;
+
+/** Cached actual port (resolved once from main process). */
+let resolvedPort: number | null = null;
+
+async function getHostApiPort(): Promise<number> {
+  if (resolvedPort != null) return resolvedPort;
+  try {
+    const port = await invokeIpc<number>('hostapi:port');
+    if (typeof port === 'number' && port > 0) {
+      resolvedPort = port;
+      return port;
+    }
+  } catch {
+    // IPC not available (e.g. non-Electron env) — fall back to default
+  }
+  return DEFAULT_HOST_API_PORT;
+}
+
+function getHostApiBase(port = DEFAULT_HOST_API_PORT): string {
+  return `http://127.0.0.1:${port}`;
+}
 
 type HostApiProxyResponse = {
   ok?: boolean;
@@ -182,7 +202,8 @@ export async function hostApiFetch<T>(path: string, init?: RequestInit): Promise
   }
 
   // Browser-only fallback (non-Electron environments).
-  const response = await fetch(`${HOST_API_BASE}${path}`, {
+  const port = await getHostApiPort();
+  const response = await fetch(`${getHostApiBase(port)}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -203,10 +224,12 @@ export async function hostApiFetch<T>(path: string, init?: RequestInit): Promise
   }
 }
 
-export function createHostEventSource(path = '/api/events'): EventSource {
-  return new EventSource(`${HOST_API_BASE}${path}`);
+export async function createHostEventSource(path = '/api/events'): Promise<EventSource> {
+  const port = await getHostApiPort();
+  return new EventSource(`${getHostApiBase(port)}${path}`);
 }
 
-export function getHostApiBase(): string {
-  return HOST_API_BASE;
+export async function getHostApiBaseUrl(): Promise<string> {
+  const port = await getHostApiPort();
+  return getHostApiBase(port);
 }
