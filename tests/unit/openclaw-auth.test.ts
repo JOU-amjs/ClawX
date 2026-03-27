@@ -201,3 +201,41 @@ describe('sanitizeOpenClawConfig', () => {
     logSpy.mockRestore();
   });
 });
+
+describe('syncGatewayTokenToConfig', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.restoreAllMocks();
+    await rm(testHome, { recursive: true, force: true });
+    await rm(testUserData, { recursive: true, force: true });
+  });
+
+  it('does not rewrite openclaw.json when gateway auth config is already up to date', async () => {
+    await writeOpenClawJson({
+      commands: { restart: true },
+      gateway: {
+        mode: 'local',
+        auth: {
+          mode: 'token',
+          token: 'gw-token',
+        },
+        controlUi: {
+          allowedOrigins: ['file://'],
+        },
+      },
+    });
+
+    const configPath = join(testHome, '.openclaw', 'openclaw.json');
+    const before = await readFile(configPath, 'utf8');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { syncGatewayTokenToConfig } = await import('@electron/utils/openclaw-auth');
+    await syncGatewayTokenToConfig('gw-token');
+
+    const after = await readFile(configPath, 'utf8');
+    expect(after).toBe(before);
+    expect(logSpy).not.toHaveBeenCalled();
+
+    logSpy.mockRestore();
+  });
+});

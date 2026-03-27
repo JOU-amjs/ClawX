@@ -62,10 +62,17 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
   }
 }
 
-/** Write a JSON file, creating parent directories if needed. */
-async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
+/** Write a JSON file only when its serialized content changes. */
+async function writeJsonFile(filePath: string, data: unknown): Promise<boolean> {
+  const nextContent = JSON.stringify(data, null, 2);
+  const currentContent = await readFile(filePath, 'utf-8').catch(() => null);
+  if (currentContent === nextContent) {
+    return false;
+  }
+
   await ensureDir(join(filePath, '..'));
-  await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  await writeFile(filePath, nextContent, 'utf-8');
+  return true;
 }
 
 // ── Types ────────────────────────────────────────────────────────
@@ -185,7 +192,7 @@ function normalizeAgentsDefaultsCompactionMode(config: Record<string, unknown>):
   }
 }
 
-async function writeOpenClawJson(config: Record<string, unknown>): Promise<void> {
+async function writeOpenClawJson(config: Record<string, unknown>): Promise<boolean> {
   normalizeAgentsDefaultsCompactionMode(config);
 
   // Ensure SIGUSR1 graceful reload is authorized by OpenClaw config.
@@ -197,7 +204,7 @@ async function writeOpenClawJson(config: Record<string, unknown>): Promise<void>
   commands.restart = true;
   config.commands = commands;
 
-  await writeJsonFile(OPENCLAW_CONFIG_PATH, config);
+  return await writeJsonFile(OPENCLAW_CONFIG_PATH, config);
 }
 
 // ── Exported Functions (all async) ───────────────────────────────
@@ -878,8 +885,9 @@ export async function syncGatewayTokenToConfig(token: string): Promise<void> {
     if (!gateway.mode) gateway.mode = 'local';
     config.gateway = gateway;
 
-    await writeOpenClawJson(config);
-    console.log('Synced gateway token to openclaw.json');
+    if (await writeOpenClawJson(config)) {
+      console.log('Synced gateway token to openclaw.json');
+    }
   });
 }
 
@@ -911,8 +919,9 @@ export async function syncBrowserConfigToOpenClaw(): Promise<void> {
     if (!changed) return;
 
     config.browser = browser;
-    await writeOpenClawJson(config);
-    console.log('Synced browser config to openclaw.json');
+    if (await writeOpenClawJson(config)) {
+      console.log('Synced browser config to openclaw.json');
+    }
   });
 }
 
@@ -950,8 +959,9 @@ export async function syncSessionIdleMinutesToOpenClaw(): Promise<void> {
     session.idleMinutes = DEFAULT_IDLE_MINUTES;
     config.session = session;
 
-    await writeOpenClawJson(config);
-    console.log(`Synced session.idleMinutes=${DEFAULT_IDLE_MINUTES} (7d) to openclaw.json`);
+    if (await writeOpenClawJson(config)) {
+      console.log(`Synced session.idleMinutes=${DEFAULT_IDLE_MINUTES} (7d) to openclaw.json`);
+    }
   });
 }
 
@@ -1415,8 +1425,9 @@ export async function sanitizeOpenClawConfig(): Promise<void> {
     }
 
     if (modified) {
-      await writeOpenClawJson(config);
-      console.log('[sanitize] openclaw.json sanitized successfully');
+      if (await writeOpenClawJson(config)) {
+        console.log('[sanitize] openclaw.json sanitized successfully');
+      }
     }
   });
 }

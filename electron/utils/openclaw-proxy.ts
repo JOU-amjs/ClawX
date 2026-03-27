@@ -43,6 +43,10 @@ export async function syncProxyConfigToOpenClaw(
       return;
     }
 
+    if (nextProxy === currentProxy) {
+      return;
+    }
+
     if (!config.channels) {
       config.channels = {};
     }

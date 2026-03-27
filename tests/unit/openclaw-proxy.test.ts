@@ -86,4 +86,28 @@ describe('syncProxyConfigToOpenClaw', () => {
     };
     expect(updatedConfig.channels.telegram.proxy).toBeUndefined();
   });
+
+  it('skips rewriting telegram proxy when the desired value is already present', async () => {
+    readOpenClawConfigMock.mockResolvedValue({
+      channels: {
+        telegram: {
+          botToken: 'token',
+          proxy: 'socks5://127.0.0.1:7891',
+        },
+      },
+    });
+
+    const { syncProxyConfigToOpenClaw } = await import('@electron/utils/openclaw-proxy');
+
+    await syncProxyConfigToOpenClaw({
+      proxyEnabled: true,
+      proxyServer: '',
+      proxyHttpServer: '',
+      proxyHttpsServer: '',
+      proxyAllServer: 'socks5://127.0.0.1:7891',
+      proxyBypassRules: '',
+    });
+
+    expect(writeOpenClawConfigMock).not.toHaveBeenCalled();
+  });
 });

@@ -359,8 +359,13 @@ export async function writeOpenClawConfig(config: OpenClawConfig): Promise<void>
                 : {};
         commands.restart = true;
         config.commands = commands;
+        const nextContent = JSON.stringify(config, null, 2);
+        const currentContent = await readFile(CONFIG_FILE, 'utf-8').catch(() => null);
+        if (currentContent === nextContent) {
+            return;
+        }
 
-        await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+        await writeFile(CONFIG_FILE, nextContent, 'utf-8');
     } catch (error) {
         logger.error('Failed to write OpenClaw config', error);
         console.error('Failed to write OpenClaw config:', error);
