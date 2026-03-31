@@ -24,7 +24,10 @@ export async function probeGatewayReady(
       settled = true;
       clearTimeout(timeout);
       try {
-        testWs.close();
+        // Use terminate() (TCP RST) instead of close() (WS close handshake)
+        // to avoid leaving TIME_WAIT connections on Windows. These probe
+        // WebSockets are short-lived and don't need a graceful close.
+        testWs.terminate();
       } catch {
         // ignore
       }
