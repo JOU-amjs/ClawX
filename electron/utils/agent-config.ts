@@ -11,7 +11,7 @@ const MAIN_AGENT_ID = 'main';
 const MAIN_AGENT_NAME = 'Main Agent';
 const DEFAULT_ACCOUNT_ID = 'default';
 /** Default workspace uses the configured OpenClaw dir (respects CLAWX_OPENCLAW_DIR). */
-function getDefaultWorkspacePath(): string {
+function getDefaultWorkspacePathBase(): string {
   return join(getOpenClawConfigDir(), 'workspace');
 }
 const AGENT_BOOTSTRAP_FILES = [
@@ -167,7 +167,7 @@ function getDefaultWorkspacePath(config: AgentConfigDocument): string {
     : undefined);
   return typeof defaults?.workspace === 'string' && defaults.workspace.trim()
     ? defaults.workspace
-    : getDefaultWorkspacePath();
+    : getDefaultWorkspacePathBase();
 }
 
 function getDefaultAgentDirPath(agentId: string): string {

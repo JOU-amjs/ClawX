@@ -29,7 +29,7 @@ import {
 } from './request-store';
 import { dispatchJsonRpcNotification, dispatchProtocolEvent } from './event-dispatch';
 import { GatewayStateController } from './state';
-import { prepareGatewayLaunchContext } from './config-sync';
+import { prepareGatewayLaunchContext, syncWorkspaceConfigToOpenClaw } from './config-sync';
 import { connectGatewaySocket, waitForGatewayReady } from './ws-client';
 import {
   findExistingGatewayProcess,
@@ -204,6 +204,15 @@ export class GatewayManager extends EventEmitter {
     this.lastSpawnSummary = null;
     this.shouldReconnect = true;
     await this.refreshReloadPolicy(true);
+
+    // Sync workspace config before any Gateway start/reconnect.
+    // This ensures the workspace path is correctly set even when
+    // connecting to an already-running Gateway (where startProcess is skipped).
+    try {
+      await syncWorkspaceConfigToOpenClaw();
+    } catch (err) {
+      logger.warn('Failed to sync workspace config before Gateway start:', err);
+    }
 
     // Lazily load device identity (async file I/O + key generation).
     // Must happen before connect() which uses the identity for the handshake.

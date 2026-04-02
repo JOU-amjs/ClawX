@@ -2,7 +2,7 @@ import { app } from 'electron';
 import path from 'path';
 import { existsSync, readFileSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { getOpenClawConfigDir } from '../utils/paths';
+import { getOpenClawConfigDir, isPortable, getAppDataBase } from '../utils/paths';
 
 function fsPath(filePath: string): string {
   if (process.platform !== 'win32') return filePath;
@@ -33,6 +33,7 @@ import { stripSystemdSupervisorEnv } from './config-sync-env';
 export interface GatewayLaunchContext {
   appSettings: Awaited<ReturnType<typeof getAllSettings>>;
   openclawDir: string;
+  cwd: string; // Working directory for Gateway process (differs from openclawDir in portable mode)
   entryScript: string;
   gatewayArgs: string[];
   forkEnv: Record<string, string | undefined>;
@@ -175,8 +176,18 @@ function ensureConfiguredPluginsUpgraded(configuredChannels: string[]): void {
  * By explicitly writing the workspace path into the config, we force the Gateway
  * to use the right directory (e.g. `openclaw-data/workspace`) instead of the
  * incorrect `~/.openclaw/workspace`.
+ *
+ * In portable mode, uses a relative path based on CLAWX_OPENCLAW_DIR env var
+ * (e.g. `openclaw-data/workspace`) to support USB drive portability.
+ * In non-portable mode, this function is a no-op (OPENCLAW_STATE_DIR is sufficient).
  */
 export async function syncWorkspaceConfigToOpenClaw(): Promise<void> {
+  // Only sync in portable mode. In normal mode, OPENCLAW_STATE_DIR env var
+  // is sufficient for OpenClaw to find the correct workspace directory.
+  if (!isPortable()) {
+    return;
+  }
+
   const openclawDir = getOpenClawConfigDir();
   const configPath = join(openclawDir, 'openclaw.json');
   if (!existsSync(fsPath(configPath))) return;
@@ -188,7 +199,15 @@ export async function syncWorkspaceConfigToOpenClaw(): Promise<void> {
     return;
   }
 
-  const desiredWorkspace = join(openclawDir, 'workspace');
+  // Use relative path based on CLAWX_OPENCLAW_DIR for portable mode.
+  // This ensures the workspace path works regardless of USB drive mount point.
+  // Example: CLAWX_OPENCLAW_DIR=openclaw-data → workspace=openclaw-data/workspace
+  // If CLAWX_OPENCLAW_DIR is not set, skip writing (rely on OPENCLAW_STATE_DIR).
+  const openclawDirEnv = process.env.CLAWX_OPENCLAW_DIR?.trim();
+  if (!openclawDirEnv) {
+    return;
+  }
+  const desiredWorkspace = join(openclawDirEnv, 'workspace');
 
   const agents = (config.agents && typeof config.agents === 'object'
     ? config.agents as Record<string, unknown>
@@ -201,7 +220,7 @@ export async function syncWorkspaceConfigToOpenClaw(): Promise<void> {
   // Only write when not already set or set to a different value.
   if (typeof currentWorkspace === 'string' && currentWorkspace.trim() === desiredWorkspace) return;
 
-  logger.info(`[workspace-sync] Setting agents.defaults.workspace = ${desiredWorkspace}`);
+  logger.info(`[workspace-sync] Setting agents.defaults.workspace = ${desiredWorkspace} (portable mode)`);
 
   if (!agents) {
     config.agents = { defaults: { workspace: desiredWorkspace } };
@@ -432,9 +451,17 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
     OPENCLAW_STATE_DIR: openclawConfigDir,
   };
 
+  // In portable mode with relative CLAWX_OPENCLAW_DIR, set cwd to app base
+  // so relative paths in openclaw.json resolve correctly.
+  // Otherwise, use openclawDir (the OpenClaw package directory).
+  const openclawDirEnv = process.env.CLAWX_OPENCLAW_DIR?.trim();
+  const usePortableCwd = isPortable() && openclawDirEnv && !path.isAbsolute(openclawDirEnv);
+  const cwd = usePortableCwd ? getAppDataBase() : openclawDir;
+
   return {
     appSettings,
     openclawDir,
+    cwd,
     entryScript,
     gatewayArgs,
     forkEnv,

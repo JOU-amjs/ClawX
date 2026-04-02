@@ -84,7 +84,7 @@ function getElectronApp() {
  * - Packaged: dirname of the executable (install dir's parent).
  * - Development: project root (two levels up from dist-electron/main/).
  */
-function getAppDataBase(): string {
+export function getAppDataBase(): string {
   const app = getElectronApp();
   if (app.isPackaged) {
     // Production: parent of the executable directory.
