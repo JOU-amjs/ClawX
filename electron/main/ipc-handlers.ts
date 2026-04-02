@@ -12,7 +12,7 @@ import { ClawHubService, ClawHubSearchParams, ClawHubInstallParams, ClawHubUnins
 import {
   type ProviderConfig,
 } from '../utils/secure-storage';
-import { getOpenClawStatus, getOpenClawDir, getOpenClawConfigDir, getOpenClawSkillsDir, ensureDir } from '../utils/paths';
+import { getOpenClawStatus, getOpenClawDir, getOpenClawConfigDir, getOpenClawSkillsDir, ensureDir, isPortable } from '../utils/paths';
 import { getOpenClawCliCommand } from '../utils/openclaw-cli';
 import { getAllSettings, getSetting, resetSettings, setSetting, type AppSettings } from '../utils/store';
 import {
@@ -2140,6 +2140,11 @@ function registerAppHandlers(): void {
     app.relaunch();
     app.quit();
   });
+
+  // Check if running in portable mode
+  ipcMain.handle('app:isPortable', () => {
+    return isPortable();
+  });
 }
 
 function registerSettingsHandlers(gatewayManager: GatewayManager): void {
@@ -2299,7 +2304,9 @@ function mimeToExt(mimeType: string): string {
   return '';
 }
 
-const OUTBOUND_DIR = join(homedir(), '.openclaw', 'media', 'outbound');
+function getOutboundDir(): string {
+  return join(getOpenClawConfigDir(), 'media', 'outbound');
+}
 
 /**
  * Generate a preview data URL for image files.
@@ -2337,13 +2344,13 @@ function registerFileHandlers(): void {
   // Stage files from real disk paths (used with dialog:open)
   ipcMain.handle('file:stage', async (_, filePaths: string[]) => {
     const fsP = await import('fs/promises');
-    await fsP.mkdir(OUTBOUND_DIR, { recursive: true });
+    await fsP.mkdir(getOutboundDir(), { recursive: true });
 
     const results = [];
     for (const filePath of filePaths) {
       const id = crypto.randomUUID();
       const ext = extname(filePath);
-      const stagedPath = join(OUTBOUND_DIR, `${id}${ext}`);
+      const stagedPath = join(getOutboundDir(), `${id}${ext}`);
       await fsP.copyFile(filePath, stagedPath);
 
       const s = await fsP.stat(stagedPath);
@@ -2368,11 +2375,11 @@ function registerFileHandlers(): void {
     mimeType: string;
   }) => {
     const fsP = await import('fs/promises');
-    await fsP.mkdir(OUTBOUND_DIR, { recursive: true });
+    await fsP.mkdir(getOutboundDir(), { recursive: true });
 
     const id = crypto.randomUUID();
     const ext = extname(payload.fileName) || mimeToExt(payload.mimeType);
-    const stagedPath = join(OUTBOUND_DIR, `${id}${ext}`);
+    const stagedPath = join(getOutboundDir(), `${id}${ext}`);
     const buffer = Buffer.from(payload.base64, 'base64');
     await fsP.writeFile(stagedPath, buffer);
 

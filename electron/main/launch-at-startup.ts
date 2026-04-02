@@ -3,6 +3,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { logger } from '../utils/logger';
 import { getSetting } from '../utils/store';
+import { isPortable } from '../utils/paths';
 
 const LINUX_AUTOSTART_FILE = join('.config', 'autostart', 'clawx.desktop');
 
@@ -80,6 +81,12 @@ export async function applyLaunchAtStartupSetting(enabled: boolean): Promise<voi
 }
 
 export async function syncLaunchAtStartupSettingFromStore(): Promise<void> {
+  // Portable mode must never write login-item / autostart entries to the host.
+  if (isPortable()) {
+    logger.info('Portable mode: skipping launch-at-startup sync');
+    return;
+  }
+
   const launchAtStartup = await getSetting('launchAtStartup');
   await applyLaunchAtStartupSetting(Boolean(launchAtStartup));
 }

@@ -29,6 +29,10 @@ extraResources:
   # Pre-bundled third-party skills (full directories, not only SKILL.md)
   - from: build/preinstalled-skills/
     to: resources/preinstalled-skills/
+  # Production environment variables file
+  # Packaged into resources so the main process can find it via process.resourcesPath
+  - from: .env.production
+    to: .env.production
   # NOTE: OpenClaw plugin mirrors (dingtalk, etc.) are bundled by the
   # afterPack hook (after-pack.cjs) directly from node_modules, so they
   # don't need an extraResources entry here.

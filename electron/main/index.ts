@@ -2,9 +2,55 @@
  * Electron Main Process Entry
  * Manages window creation, system tray, and IPC handlers
  */
+import { existsSync, readFileSync } from 'fs';
+import { join, dirname, isAbsolute as pathIsAbsolute, resolve } from 'path';
+
+// Load .env files BEFORE any other imports that depend on process.env.
+// Priority: .env.{NODE_ENV}.local > .env.local > .env.{NODE_ENV} > .env
+// (mirrors Vite's env loading order for the main process)
+{
+  const projectRoot = resolve(join(__dirname, '../..'));
+  const mode = process.env.NODE_ENV || (app.isPackaged ? 'production' : 'development');
+  const candidates = [
+    `.env.${mode}.local`,
+    '.env.local',
+    `.env.${mode}`,
+    '.env',
+  ];
+  // Search directories: in packaged mode also look in process.resourcesPath
+  // (where .env.production is copied via electron-builder extraResources).
+  const searchDirs = app.isPackaged
+    ? [dirname(process.execPath), process.resourcesPath!]
+    : [projectRoot];
+  for (const name of candidates) {
+    for (const searchDir of searchDirs) {
+      const filePath = join(searchDir, name);
+      if (existsSync(filePath)) {
+        try {
+          for (const line of readFileSync(filePath, 'utf-8').split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) continue;
+            const eqIdx = trimmed.indexOf('=');
+            if (eqIdx < 1) continue;
+            const key = trimmed.slice(0, eqIdx).trim();
+            let val = trimmed.slice(eqIdx + 1).trim();
+            // Remove surrounding quotes
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+              val = val.slice(1, -1);
+            }
+            if (!(key in process.env)) {
+              process.env[key] = val;
+            }
+          }
+        } catch { /* ignore read errors */ }
+      }
+    }
+  }
+}
+
 import { app, BrowserWindow, nativeImage, session, shell } from 'electron';
 import type { Server } from 'node:http';
-import { join } from 'path';
+import { homedir } from 'os';
 import { GatewayManager } from '../gateway/manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { createTray } from './tray';
@@ -43,13 +89,30 @@ import { deviceOAuthManager } from '../utils/device-oauth';
 import { browserOAuthManager } from '../utils/browser-oauth';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
 import { syncAllProviderAuthToRuntime } from '../services/providers/provider-runtime-sync';
+import { isPortable } from '../utils/paths';
 
 const WINDOWS_APP_USER_MODEL_ID = 'app.clawx.desktop';
 const isE2EMode = process.env.CLAWX_E2E === '1';
-const requestedUserDataDir = process.env.CLAWX_USER_DATA_DIR?.trim();
+const portableMode = isPortable();
+const rawUserDataDir = process.env.CLAWX_USER_DATA_DIR?.trim();
 
-if (isE2EMode && requestedUserDataDir) {
-  app.setPath('userData', requestedUserDataDir);
+// Resolve CLAWX_USER_DATA_DIR for all modes (not just E2E).
+// Supports absolute paths, ~-prefixed paths, and relative paths.
+// Relative paths: dev → project root, prod → install directory's parent.
+if (rawUserDataDir) {
+  let resolvedDir: string;
+  if (rawUserDataDir.startsWith('~')) {
+    resolvedDir = rawUserDataDir.replace(/^~/, homedir());
+  } else if (pathIsAbsolute(rawUserDataDir)) {
+    resolvedDir = rawUserDataDir;
+  } else {
+    // Relative path base: dev → project root, prod → install dir parent
+    const base = app.isPackaged
+      ? dirname(process.execPath)
+      : resolve(join(__dirname, '../..'));
+    resolvedDir = resolve(join(base, rawUserDataDir));
+  }
+  app.setPath('userData', resolvedDir);
 }
 
 // Disable GPU hardware acceleration globally for maximum stability across
@@ -279,7 +342,7 @@ async function initialize(): Promise<void> {
   logger.init();
   logger.info('=== ClawX Application Starting ===');
   logger.debug(
-    `Runtime: platform=${process.platform}/${process.arch}, electron=${process.versions.electron}, node=${process.versions.node}, packaged=${app.isPackaged}, pid=${process.pid}, ppid=${process.ppid}`
+    `Runtime: platform=${process.platform}/${process.arch}, electron=${process.versions.electron}, node=${process.versions.node}, packaged=${app.isPackaged}, pid=${process.pid}, ppid=${process.ppid}, portable=${portableMode}`
   );
 
   if (!isE2EMode) {
@@ -291,7 +354,11 @@ async function initialize(): Promise<void> {
 
     // Apply persisted proxy settings before creating windows or network requests.
     await applyProxySettings();
-    await syncLaunchAtStartupSettingFromStore();
+    if (!portableMode) {
+      await syncLaunchAtStartupSettingFromStore();
+    } else {
+      logger.info('Portable mode: skipping launch-at-startup sync');
+    }
   } else {
     logger.info('Running in E2E mode: startup side effects minimized');
   }
@@ -483,7 +550,8 @@ async function initialize(): Promise<void> {
   }
 
   // Auto-install openclaw CLI and shell completions (non-blocking).
-  if (!isE2EMode) {
+  // Skipped in portable mode to avoid writing to host machine.
+  if (!isE2EMode && !portableMode) {
     void autoInstallCliIfNeeded((installedPath) => {
       mainWindow?.webContents.send('openclaw:cli-installed', installedPath);
     }).then(() => {
@@ -492,6 +560,8 @@ async function initialize(): Promise<void> {
     }).catch((error) => {
       logger.warn('CLI auto-install failed:', error);
     });
+  } else if (!isE2EMode && portableMode) {
+    logger.info('Portable mode: skipping CLI auto-install and shell completions');
   }
 }
 

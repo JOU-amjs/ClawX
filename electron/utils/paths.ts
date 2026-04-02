@@ -3,7 +3,7 @@
  * Cross-platform path resolution helpers
  */
 import { createRequire } from 'node:module';
-import { join } from 'path';
+import { join, resolve, dirname, isAbsolute as pathIsAbsolute } from 'path';
 import { homedir } from 'os';
 import { existsSync, mkdirSync, readFileSync, realpathSync } from 'fs';
 
@@ -18,6 +18,48 @@ export {
   normalizeNodeRequirePathForNodeOptions,
   appendNodeRequireToNodeOptions,
 } from './win-shell';
+
+// ── Portable Mode ────────────────────────────────────────────────────────────
+
+/** @internal exported for tests */
+export { getPortableAppDir };
+
+/**
+ * Detect whether the app is running in portable mode.
+ *
+ * Portable mode is activated when EITHER:
+ * 1. `CLAWX_PORTABLE=1` environment variable is set, OR
+ * 2. A `portable.marker` file exists next to the executable (packaged builds)
+ *    or in the project root (development).
+ *
+ * In portable mode the app keeps ALL data on the portable drive and never
+ * writes to the host machine's user directories (no PATH changes, no shell
+ * profile modifications, no login-item registration).
+ */
+export function isPortable(): boolean {
+  if (process.env.CLAWX_PORTABLE === '1') return true;
+
+  if (process.versions?.electron) {
+    const app = require('electron') as typeof import('electron');
+    const markerDir = getPortableAppDir(app.app);
+    const markerPath = join(markerDir, 'portable.marker');
+    if (existsSync(markerPath)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Return the directory that contains (or would contain) `portable.marker`.
+ * - Packaged: dirname of the executable.
+ * - Dev:      project root.
+ */
+function getPortableAppDir(app: ElectronAppLike): string {
+  if (app.isPackaged) {
+    return dirname(process.execPath);
+  }
+  return resolve(join(__dirname, '../..'));
+}
 
 function getElectronApp() {
   if (process.versions?.electron) {
@@ -38,6 +80,44 @@ function getElectronApp() {
 }
 
 /**
+ * Resolve the application base directory.
+ * - Packaged: dirname of the executable (install dir's parent).
+ * - Development: project root (two levels up from dist-electron/main/).
+ */
+function getAppDataBase(): string {
+  const app = getElectronApp();
+  if (app.isPackaged) {
+    // Production: parent of the executable directory.
+    // e.g. C:\Users\xxx\AppData\Local\Programs\ClawX\ClawX.exe → Programs
+    // This ensures relative paths resolve to the install directory's parent.
+    try {
+      const exePath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
+        || dirname(process.execPath);
+      return dirname(exePath);
+    } catch {
+      return dirname(process.execPath);
+    }
+  }
+  // Development: project root directory
+  return resolve(join(__dirname, '../..'));
+}
+
+/**
+ * Resolve a data directory path from an environment variable.
+ * Supports absolute paths, ~-prefixed paths, and relative paths.
+ * Relative paths are resolved against the app base directory.
+ */
+export function resolveDataDir(envValue: string | undefined, fallback: string): string {
+  if (!envValue?.trim()) return fallback;
+  const trimmed = envValue.trim();
+  if (trimmed.startsWith('~')) {
+    return trimmed.replace(/^~/, homedir());
+  }
+  if (pathIsAbsolute(trimmed)) return trimmed;
+  return resolve(join(getAppDataBase(), trimmed));
+}
+
+/**
  * Expand ~ to home directory
  */
 export function expandPath(path: string): string {
@@ -48,10 +128,12 @@ export function expandPath(path: string): string {
 }
 
 /**
- * Get OpenClaw config directory
+ * Get OpenClaw config directory.
+ * Supports CLAWX_OPENCLAW_DIR environment variable for custom path.
+ * Falls back to ~/.openclaw when not set.
  */
 export function getOpenClawConfigDir(): string {
-  return join(homedir(), '.openclaw');
+  return resolveDataDir(process.env.CLAWX_OPENCLAW_DIR, join(homedir(), '.openclaw'));
 }
 
 /**
@@ -62,9 +144,18 @@ export function getOpenClawSkillsDir(): string {
 }
 
 /**
- * Get ClawX config directory
+ * Get ClawX config directory.
+ * Supports CLAWX_CONFIG_DIR environment variable for custom path.
+ * Falls back to ~/.clawx when not set.
+ * In portable mode, defaults to data/.clawx relative to the app directory.
  */
 export function getClawXConfigDir(): string {
+  if (process.env.CLAWX_CONFIG_DIR?.trim()) {
+    return resolveDataDir(process.env.CLAWX_CONFIG_DIR, join(homedir(), '.clawx'));
+  }
+  if (isPortable()) {
+    return resolveDataDir('data/.clawx', join(homedir(), '.clawx'));
+  }
   return join(homedir(), '.clawx');
 }
 

@@ -1,8 +1,8 @@
 import { app } from 'electron';
 import path from 'path';
-import { existsSync, readFileSync, mkdirSync, rmSync } from 'fs';
-import { homedir } from 'os';
+import { existsSync, readFileSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { getOpenClawConfigDir } from '../utils/paths';
 
 function fsPath(filePath: string): string {
   if (process.platform !== 'win32') return filePath;
@@ -63,7 +63,7 @@ const BUILTIN_CHANNEL_EXTENSIONS = ['discord', 'telegram'];
 
 function cleanupStaleBuiltInExtensions(): void {
   for (const ext of BUILTIN_CHANNEL_EXTENSIONS) {
-    const extDir = join(homedir(), '.openclaw', 'extensions', ext);
+    const extDir = join(getOpenClawConfigDir(), 'extensions', ext);
     if (existsSync(fsPath(extDir))) {
       logger.info(`[plugin] Removing stale built-in extension copy: ${ext}`);
       try {
@@ -109,7 +109,7 @@ function ensureConfiguredPluginsUpgraded(configuredChannels: string[]): void {
     if (!pluginInfo) continue;
     const { dirName, npmName } = pluginInfo;
 
-    const targetDir = join(homedir(), '.openclaw', 'extensions', dirName);
+    const targetDir = join(getOpenClawConfigDir(), 'extensions', dirName);
     const targetManifest = join(targetDir, 'openclaw.plugin.json');
     const isInstalled = existsSync(fsPath(targetManifest));
     const installedVersion = isInstalled ? readPluginVersion(join(targetDir, 'package.json')) : null;
@@ -124,7 +124,7 @@ function ensureConfiguredPluginsUpgraded(configuredChannels: string[]): void {
       if (!isInstalled || (sourceVersion && installedVersion && sourceVersion !== installedVersion)) {
         logger.info(`[plugin] ${isInstalled ? 'Auto-upgrading' : 'Installing'} ${channelType} plugin${isInstalled ? `: ${installedVersion} → ${sourceVersion}` : `: ${sourceVersion}`} (bundled)`);
         try {
-          mkdirSync(fsPath(join(homedir(), '.openclaw', 'extensions')), { recursive: true });
+          mkdirSync(fsPath(join(getOpenClawConfigDir(), 'extensions')), { recursive: true });
           rmSync(fsPath(targetDir), { recursive: true, force: true });
           cpSyncSafe(bundledDir, targetDir);
           fixupPluginManifest(targetDir);
@@ -154,7 +154,7 @@ function ensureConfiguredPluginsUpgraded(configuredChannels: string[]): void {
       logger.info(`[plugin] ${isInstalled ? 'Auto-upgrading' : 'Installing'} ${channelType} plugin${isInstalled ? `: ${installedVersion} → ${sourceVersion}` : `: ${sourceVersion}`} (dev/node_modules)`);
 
       try {
-        mkdirSync(fsPath(join(homedir(), '.openclaw', 'extensions')), { recursive: true });
+        mkdirSync(fsPath(join(getOpenClawConfigDir(), 'extensions')), { recursive: true });
         copyPluginFromNodeModules(npmPkgPath, targetDir, npmName);
         fixupPluginManifest(targetDir);
       } catch (err) {
@@ -164,12 +164,74 @@ function ensureConfiguredPluginsUpgraded(configuredChannels: string[]): void {
   }
 }
 
+// ── Workspace path sync ──────────────────────────────────────────
+
+/**
+ * Ensure `agents.defaults.workspace` in openclaw.json points to the correct
+ * directory under the configured OpenClaw state dir.
+ *
+ * OpenClaw's `resolveDefaultAgentWorkspaceDir()` hard-codes `~/.openclaw/workspace`
+ * and does NOT honour `OPENCLAW_STATE_DIR` for the main agent's workspace fallback.
+ * By explicitly writing the workspace path into the config, we force the Gateway
+ * to use the right directory (e.g. `openclaw-data/workspace`) instead of the
+ * incorrect `~/.openclaw/workspace`.
+ */
+export async function syncWorkspaceConfigToOpenClaw(): Promise<void> {
+  const openclawDir = getOpenClawConfigDir();
+  const configPath = join(openclawDir, 'openclaw.json');
+  if (!existsSync(fsPath(configPath))) return;
+
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(readFileSync(fsPath(configPath), 'utf-8'));
+  } catch {
+    return;
+  }
+
+  const desiredWorkspace = join(openclawDir, 'workspace');
+
+  const agents = (config.agents && typeof config.agents === 'object'
+    ? config.agents as Record<string, unknown>
+    : null);
+  const defaults = (agents && typeof agents.defaults === 'object'
+    ? agents.defaults as Record<string, unknown>
+    : null);
+  const currentWorkspace = defaults?.workspace;
+
+  // Only write when not already set or set to a different value.
+  if (typeof currentWorkspace === 'string' && currentWorkspace.trim() === desiredWorkspace) return;
+
+  logger.info(`[workspace-sync] Setting agents.defaults.workspace = ${desiredWorkspace}`);
+
+  if (!agents) {
+    config.agents = { defaults: { workspace: desiredWorkspace } };
+  } else if (!defaults) {
+    (config.agents as Record<string, unknown>).defaults = { workspace: desiredWorkspace };
+  } else {
+    (defaults as Record<string, unknown>).workspace = desiredWorkspace;
+  }
+
+  // Persist the updated config.
+  try {
+    mkdirSync(fsPath(openclawDir), { recursive: true });
+    writeFileSync(fsPath(configPath), JSON.stringify(config, null, 2), 'utf-8');
+  } catch (err) {
+    logger.warn('[workspace-sync] Failed to write workspace path to openclaw.json:', err);
+  }
+}
+
 // ── Pre-launch sync ──────────────────────────────────────────────
 
 export async function syncGatewayConfigBeforeLaunch(
   appSettings: Awaited<ReturnType<typeof getAllSettings>>,
 ): Promise<void> {
   await syncProxyConfigToOpenClaw(appSettings, { preserveExistingWhenDisabled: true });
+
+  try {
+    await syncWorkspaceConfigToOpenClaw();
+  } catch (err) {
+    logger.warn('Failed to sync workspace config to openclaw.json:', err);
+  }
 
   try {
     await sanitizeOpenClawConfig();
@@ -354,6 +416,7 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
   const baseEnvPatched = binPathExists
     ? prependPathEntry(baseEnvRecord, binPath).env
     : baseEnvRecord;
+  const openclawConfigDir = getOpenClawConfigDir();
   const forkEnv: Record<string, string | undefined> = {
     ...stripSystemdSupervisorEnv(baseEnvPatched),
     ...providerEnv,
@@ -363,6 +426,10 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
     OPENCLAW_SKIP_CHANNELS: skipChannels ? '1' : '',
     CLAWDBOT_SKIP_CHANNELS: skipChannels ? '1' : '',
     OPENCLAW_NO_RESPAWN: '1',
+    // OPENCLAW_STATE_DIR overrides OpenClaw's mutable data root (sessions,
+    // workspaces, agents, logs, extensions, etc.).  Without this, OpenClaw
+    // defaults to ~/.openclaw regardless of CLAWX_OPENCLAW_DIR.
+    OPENCLAW_STATE_DIR: openclawConfigDir,
   };
 
   return {

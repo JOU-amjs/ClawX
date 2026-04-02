@@ -4,7 +4,7 @@ import 'zx/globals';
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const UV_VERSION = '0.10.0';
-const BASE_URL = `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}`;
+const BASE_URL = `https://ghfast.top/https://github.com/astral-sh/uv/releases/download/${UV_VERSION}`;
 const OUTPUT_BASE = path.join(ROOT_DIR, 'resources', 'bin');
 
 // Mapping Node platforms/archs to uv release naming
@@ -50,17 +50,25 @@ async function setupTarget(id) {
   }
 
   const targetDir = path.join(OUTPUT_BASE, id);
+  const destBin = path.join(targetDir, target.binName);
+
+  // Skip if binary already exists (use --force to override)
+  if (!argv.force && await fs.pathExists(destBin)) {
+    echo(chalk.gray`⏭️  Skipping ${id}: ${target.binName} already exists (use --force to re-download)`);
+    return;
+  }
+
   const tempDir = path.join(ROOT_DIR, 'temp_uv_extract');
   const archivePath = path.join(ROOT_DIR, target.filename);
   const downloadUrl = `${BASE_URL}/${target.filename}`;
 
   echo(chalk.blue`\n📦 Setting up uv for ${id}...`);
 
-  // Cleanup & Prep
-  await fs.remove(targetDir);
-  await fs.remove(tempDir);
+  // Cleanup & Prep — only remove our own binary, not the entire directory
+  // (node.exe may already exist here from download-bundled-node.mjs)
   await fs.ensureDir(targetDir);
   await fs.ensureDir(tempDir);
+  await fs.remove(tempDir);
 
   try {
     // Download
@@ -88,7 +96,6 @@ async function setupTarget(id) {
     // uv archives usually contain a folder named after the target
     const folderName = target.filename.replace('.tar.gz', '').replace('.zip', '');
     const sourceBin = path.join(tempDir, folderName, target.binName);
-    const destBin = path.join(targetDir, target.binName);
 
     if (await fs.pathExists(sourceBin)) {
       await fs.move(sourceBin, destBin, { overwrite: true });

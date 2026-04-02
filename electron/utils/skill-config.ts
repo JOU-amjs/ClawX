@@ -9,13 +9,15 @@ import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { constants } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
-import { getOpenClawDir, getResourcesDir } from './paths';
+import { getOpenClawDir, getResourcesDir, getOpenClawConfigDir } from './paths';
 import { logger } from './logger';
 import { cpAsyncSafe } from './plugin-install';
 import { withConfigLock } from './config-mutex';
 
-const OPENCLAW_CONFIG_PATH = join(homedir(), '.openclaw', 'openclaw.json');
+/** Lazily resolve openclaw.json path so CLAWX_OPENCLAW_DIR is honoured after .env loading. */
+function getOpenClawConfigPath(): string {
+    return join(getOpenClawConfigDir(), 'openclaw.json');
+}
 
 interface SkillEntry {
     enabled?: boolean;
@@ -65,11 +67,11 @@ async function fileExists(p: string): Promise<boolean> {
  * Read the current OpenClaw config
  */
 async function readConfig(): Promise<OpenClawConfig> {
-    if (!(await fileExists(OPENCLAW_CONFIG_PATH))) {
+    if (!(await fileExists(getOpenClawConfigPath()))) {
         return {};
     }
     try {
-        const raw = await readFile(OPENCLAW_CONFIG_PATH, 'utf-8');
+        const raw = await readFile(getOpenClawConfigPath(), 'utf-8');
         return JSON.parse(raw);
     } catch (err) {
         console.error('Failed to read openclaw config:', err);
@@ -82,7 +84,7 @@ async function readConfig(): Promise<OpenClawConfig> {
  */
 async function writeConfig(config: OpenClawConfig): Promise<void> {
     const json = JSON.stringify(config, null, 2);
-    await writeFile(OPENCLAW_CONFIG_PATH, json, 'utf-8');
+    await writeFile(getOpenClawConfigPath(), json, 'utf-8');
 }
 
 async function setSkillsEnabled(skillKeys: string[], enabled: boolean): Promise<void> {
@@ -201,7 +203,7 @@ const BUILTIN_SKILLS = [] as const;
  * block the normal startup flow.
  */
 export async function ensureBuiltinSkillsInstalled(): Promise<void> {
-    const skillsRoot = join(homedir(), '.openclaw', 'skills');
+    const skillsRoot = join(getOpenClawConfigDir(), 'skills');
 
     for (const { slug, sourceExtension } of BUILTIN_SKILLS) {
         const targetDir = join(skillsRoot, slug);
@@ -329,7 +331,7 @@ export async function ensurePreinstalledSkillsInstalled(): Promise<void> {
     }
     const lockVersions = await readPreinstalledLockVersions(sourceRoot);
 
-    const targetRoot = join(homedir(), '.openclaw', 'skills');
+    const targetRoot = join(getOpenClawConfigDir(), 'skills');
     await mkdir(targetRoot, { recursive: true });
     const toEnable: string[] = [];
 

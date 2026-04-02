@@ -30,21 +30,25 @@ async function setupTarget(id) {
   }
 
   const targetDir = path.join(OUTPUT_BASE, id);
+  const outputNode = path.join(targetDir, 'node.exe');
+
+  // Skip if binary already exists (use --force to override)
+  if (!argv.force && await fs.pathExists(outputNode)) {
+    echo(chalk.gray`⏭️  Skipping ${id}: node.exe already exists (use --force to re-download)`);
+    return;
+  }
+
   const tempDir = path.join(ROOT_DIR, 'temp_node_extract');
   const archivePath = path.join(ROOT_DIR, target.filename);
   const downloadUrl = `${BASE_URL}/${target.filename}`;
 
   echo(chalk.blue`\n📦 Setting up Node.js for ${id}...`);
 
-  // Only remove the target binary, not the entire directory,
-  // to avoid deleting uv.exe or other binaries placed by other download scripts.
-  const outputNode = path.join(targetDir, 'node.exe');
-  if (await fs.pathExists(outputNode)) {
-    await fs.remove(outputNode);
-  }
-  await fs.remove(tempDir);
+  // Cleanup & Prep — only remove our own binary, not the entire directory
+  // (uv.exe may already exist here from download-bundled-uv.mjs)
   await fs.ensureDir(targetDir);
   await fs.ensureDir(tempDir);
+  await fs.remove(tempDir);
 
   try {
     echo`⬇️ Downloading: ${downloadUrl}`;

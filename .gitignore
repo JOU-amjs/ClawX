@@ -24,6 +24,11 @@ release/
 .env.local
 .env.*.local
 
+# Local data directories
+userdata/
+openclaw-data/
+data/
+
 # Logs
 logs
 *.log
@@ -55,6 +60,9 @@ test-results/
 *.rpm
 
 resources/bin
+
+# Portable mode marker (created by build, not committed)
+portable.marker
 
 # Secrets
 *.p12

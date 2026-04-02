@@ -9,9 +9,9 @@ import { app } from 'electron';
 import path from 'node:path';
 import { existsSync, cpSync, copyFileSync, statSync, mkdirSync, rmSync, readFileSync, writeFileSync, readdirSync, realpathSync } from 'node:fs';
 import { readdir, stat, copyFile, mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { logger } from './logger';
+import { getOpenClawConfigDir } from './paths';
 
 function normalizeFsPathForWindows(filePath: string): string {
   if (process.platform !== 'win32') return filePath;
@@ -362,7 +362,7 @@ export function ensurePluginInstalled(
   candidateSources: string[],
   pluginLabel: string,
 ): { installed: boolean; warning?: string } {
-  const targetDir = join(homedir(), '.openclaw', 'extensions', pluginDirName);
+  const targetDir = join(getOpenClawConfigDir(), 'extensions', pluginDirName);
   const targetManifest = join(targetDir, 'openclaw.plugin.json');
   const targetPkgJson = join(targetDir, 'package.json');
 
@@ -384,7 +384,7 @@ export function ensurePluginInstalled(
 
   // Fresh install or upgrade — try bundled/build sources first
   if (sourceDir) {
-    const extensionsRoot = join(homedir(), '.openclaw', 'extensions');
+    const extensionsRoot = join(getOpenClawConfigDir(), 'extensions');
     const attempts: Array<{ attempt: number; code?: string; name?: string; message: string }> = [];
     const maxAttempts = process.platform === 'win32' ? 2 : 1;
 
@@ -441,7 +441,7 @@ export function ensurePluginInstalled(
             `${installedVersion ? `: ${installedVersion} → ${sourceVersion}` : `: ${sourceVersion}`} (dev/node_modules)`,
           );
           try {
-            mkdirSync(fsPath(join(homedir(), '.openclaw', 'extensions')), { recursive: true });
+            mkdirSync(fsPath(join(getOpenClawConfigDir(), 'extensions')), { recursive: true });
             copyPluginFromNodeModules(npmPkgPath, targetDir, npmName);
             fixupPluginManifest(targetDir);
             if (existsSync(fsPath(join(targetDir, 'openclaw.plugin.json')))) {
