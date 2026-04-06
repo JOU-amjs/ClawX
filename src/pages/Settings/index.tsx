@@ -478,10 +478,10 @@ export function Settings() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-start justify-between mb-12 shrink-0 gap-4">
           <div>
-            <h1 className="text-5xl md:text-6xl font-serif text-foreground mb-3 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+            <h1 className="text-4xl md:text-5xl text-foreground mb-3 font-bold tracking-tight">
               {t('title')}
             </h1>
-            <p className="text-[17px] text-foreground/70 font-medium">
+            <p className="text-base text-foreground/60 font-normal">
               {t('subtitle')}
             </p>
           </div>
@@ -492,7 +492,7 @@ export function Settings() {
 
           {/* Appearance */}
           <div>
-            <h2 className="text-3xl font-serif text-foreground mb-6 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+            <h2 className="text-2xl text-foreground mb-6 font-semibold tracking-tight">
               {t('appearance.title')}
             </h2>
             <div className="space-y-6">
@@ -501,7 +501,7 @@ export function Settings() {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant={theme === 'light' ? 'secondary' : 'outline'}
-                    className={cn("rounded-full px-5 h-10 border-black/10 dark:border-white/10", theme === 'light' ? "bg-black/5 dark:bg-white/10 text-foreground" : "bg-transparent text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5")}
+                    className={cn("rounded-md px-5 h-10 border-border", theme === 'light' ? "bg-accent text-foreground" : "bg-transparent text-muted-foreground hover:bg-accent/50")}
                     onClick={() => setTheme('light')}
                   >
                     <Sun className="h-4 w-4 mr-2" />
@@ -509,7 +509,7 @@ export function Settings() {
                   </Button>
                   <Button
                     variant={theme === 'dark' ? 'secondary' : 'outline'}
-                    className={cn("rounded-full px-5 h-10 border-black/10 dark:border-white/10", theme === 'dark' ? "bg-black/5 dark:bg-white/10 text-foreground" : "bg-transparent text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5")}
+                    className={cn("rounded-md px-5 h-10 border-border", theme === 'dark' ? "bg-accent text-foreground" : "bg-transparent text-muted-foreground hover:bg-accent/50")}
                     onClick={() => setTheme('dark')}
                   >
                     <Moon className="h-4 w-4 mr-2" />
@@ -517,7 +517,7 @@ export function Settings() {
                   </Button>
                   <Button
                     variant={theme === 'system' ? 'secondary' : 'outline'}
-                    className={cn("rounded-full px-5 h-10 border-black/10 dark:border-white/10", theme === 'system' ? "bg-black/5 dark:bg-white/10 text-foreground" : "bg-transparent text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5")}
+                    className={cn("rounded-md px-5 h-10 border-border", theme === 'system' ? "bg-accent text-foreground" : "bg-transparent text-muted-foreground hover:bg-accent/50")}
                     onClick={() => setTheme('system')}
                   >
                     <Monitor className="h-4 w-4 mr-2" />
@@ -532,7 +532,7 @@ export function Settings() {
                     <Button
                       key={lang.code}
                       variant={language === lang.code ? 'secondary' : 'outline'}
-                      className={cn("rounded-full px-5 h-10 border-black/10 dark:border-white/10", language === lang.code ? "bg-black/5 dark:bg-white/10 text-foreground" : "bg-transparent text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5")}
+                      className={cn("rounded-md px-5 h-10 border-border", language === lang.code ? "bg-accent text-foreground" : "bg-transparent text-muted-foreground hover:bg-accent/50")}
                       onClick={() => setLanguage(lang.code)}
                     >
                       {lang.label}
@@ -555,11 +555,11 @@ export function Settings() {
             </div>
           </div>
 
-          <Separator className="bg-black/5 dark:bg-white/5" />
+          <Separator className="bg-border" />
 
           {/* Gateway */}
           <div>
-            <h2 className="text-3xl font-serif text-foreground mb-6 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+            <h2 className="text-2xl text-foreground mb-6 font-semibold tracking-tight">
               {t('gateway.title')}
             </h2>
             <div className="space-y-6">
@@ -572,10 +572,10 @@ export function Settings() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium border",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium border",
                     gatewayStatus.state === 'running' ? "bg-green-500/10 text-green-600 dark:text-green-500 border-green-500/20" :
                       gatewayStatus.state === 'error' ? "bg-red-500/10 text-red-600 dark:text-red-500 border-red-500/20" :
-                        "bg-black/5 dark:bg-white/5 text-muted-foreground border-transparent"
+                        "bg-muted text-muted-foreground border-transparent"
                   )}>
                     <div className={cn("w-1.5 h-1.5 rounded-full",
                       gatewayStatus.state === 'running' ? "bg-green-500" :
@@ -583,11 +583,11 @@ export function Settings() {
                     )} />
                     {gatewayStatus.state}
                   </div>
-                  <Button variant="outline" size="sm" onClick={restartGateway} className="rounded-full h-8 px-4 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5">
+                  <Button variant="outline" size="sm" onClick={restartGateway} className="rounded-md h-8 px-4 border-border bg-transparent hover:bg-accent/50">
                     <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                     {t('common:actions.restart')}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleShowLogs} className="rounded-full h-8 px-4 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5">
+                  <Button variant="outline" size="sm" onClick={handleShowLogs} className="rounded-md h-8 px-4 border-border bg-transparent hover:bg-accent/50">
                     <FileText className="h-3.5 w-3.5 mr-1.5" />
                     {t('gateway.logs')}
                   </Button>
@@ -595,20 +595,20 @@ export function Settings() {
               </div>
 
               {showLogs && (
-                <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
                   <div className="flex items-center justify-between mb-3">
                     <p className="font-medium text-[14px]">{t('gateway.appLogs')}</p>
                     <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" className="h-7 text-[12px] rounded-full hover:bg-black/5 dark:hover:bg-white/10" onClick={handleOpenLogDir}>
+                      <Button variant="ghost" size="sm" className="h-7 text-[12px] rounded-md hover:bg-accent" onClick={handleOpenLogDir}>
                         <ExternalLink className="h-3 w-3 mr-1.5" />
                         {t('gateway.openFolder')}
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 text-[12px] rounded-full hover:bg-black/5 dark:hover:bg-white/10" onClick={() => setShowLogs(false)}>
+                      <Button variant="ghost" size="sm" className="h-7 text-[12px] rounded-md hover:bg-accent" onClick={() => setShowLogs(false)}>
                         {t('common:actions.close')}
                       </Button>
                     </div>
                   </div>
-                  <pre className="text-[12px] text-muted-foreground bg-white dark:bg-card p-4 rounded-xl max-h-60 overflow-auto whitespace-pre-wrap font-mono border border-black/5 dark:border-white/5 shadow-inner">
+                  <pre className="text-[12px] text-muted-foreground bg-card p-4 rounded-md max-h-60 overflow-auto whitespace-pre-wrap font-mono border border-border shadow-soft">
                     {logContent || t('chat:noLogs')}
                   </pre>
                 </div>
@@ -662,9 +662,9 @@ export function Settings() {
           {/* Developer */}
           {devModeUnlocked && (
             <>
-              <Separator className="bg-black/5 dark:bg-white/5" />
+              <Separator className="bg-border" />
               <div data-testid="settings-developer-section">
-                <h2 data-testid="settings-developer-title" className="text-3xl font-serif text-foreground mb-6 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+                <h2 data-testid="settings-developer-title" className="text-2xl text-foreground mb-6 font-semibold tracking-tight">
                   {t('developer.title')}
                 </h2>
                 <div className="space-y-8">
@@ -690,7 +690,7 @@ export function Settings() {
                         onClick={handleSaveProxySettings}
                         disabled={savingProxy || !proxySettingsDirty}
                         data-testid="settings-proxy-save-button"
-                        className="rounded-xl h-10 px-5 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                        className="rounded-md h-10 px-5 bg-transparent border-border hover:bg-accent/50"
                       >
                         <RefreshCw className={`h-4 w-4 mr-2${savingProxy ? ' animate-spin' : ''}`} />
                         {savingProxy ? t('common:status.saving') : t('common:actions.save')}
@@ -710,7 +710,7 @@ export function Settings() {
                               value={proxyServerDraft}
                               onChange={(event) => setProxyServerDraft(event.target.value)}
                               placeholder="http://127.0.0.1:7890"
-                              className="h-10 rounded-xl bg-black/5 dark:bg-white/5 border-transparent font-mono text-[13px]"
+                              className="h-10 rounded-md bg-muted/50 border-border font-mono text-[13px]"
                             />
                             <p className="text-[11px] text-muted-foreground">
                               {t('gateway.proxyServerHelp')}
@@ -724,7 +724,7 @@ export function Settings() {
                               value={proxyHttpServerDraft}
                               onChange={(event) => setProxyHttpServerDraft(event.target.value)}
                               placeholder={proxyServerDraft || 'http://127.0.0.1:7890'}
-                              className="h-10 rounded-xl bg-black/5 dark:bg-white/5 border-transparent font-mono text-[13px]"
+                              className="h-10 rounded-md bg-muted/50 border-border font-mono text-[13px]"
                             />
                             <p className="text-[11px] text-muted-foreground">
                               {t('gateway.proxyHttpServerHelp')}
@@ -738,7 +738,7 @@ export function Settings() {
                               value={proxyHttpsServerDraft}
                               onChange={(event) => setProxyHttpsServerDraft(event.target.value)}
                               placeholder={proxyServerDraft || 'http://127.0.0.1:7890'}
-                              className="h-10 rounded-xl bg-black/5 dark:bg-white/5 border-transparent font-mono text-[13px]"
+                              className="h-10 rounded-md bg-muted/50 border-border font-mono text-[13px]"
                             />
                             <p className="text-[11px] text-muted-foreground">
                               {t('gateway.proxyHttpsServerHelp')}
@@ -752,7 +752,7 @@ export function Settings() {
                               value={proxyAllServerDraft}
                               onChange={(event) => setProxyAllServerDraft(event.target.value)}
                               placeholder={proxyServerDraft || 'socks5://127.0.0.1:7891'}
-                              className="h-10 rounded-xl bg-black/5 dark:bg-white/5 border-transparent font-mono text-[13px]"
+                              className="h-10 rounded-md bg-muted/50 border-border font-mono text-[13px]"
                             />
                             <p className="text-[11px] text-muted-foreground">
                               {t('gateway.proxyAllServerHelp')}
@@ -767,7 +767,7 @@ export function Settings() {
                             value={proxyBypassRulesDraft}
                             onChange={(event) => setProxyBypassRulesDraft(event.target.value)}
                             placeholder="<local>;localhost;127.0.0.1;::1"
-                            className="h-10 rounded-xl bg-black/5 dark:bg-white/5 border-transparent font-mono text-[13px]"
+                            className="h-10 rounded-md bg-muted/50 border-border font-mono text-[13px]"
                           />
                           <p className="text-[11px] text-muted-foreground">
                             {t('gateway.proxyBypassHelp')}
@@ -788,14 +788,14 @@ export function Settings() {
                         readOnly
                         value={controlUiInfo?.token || ''}
                         placeholder={t('developer.tokenUnavailable')}
-                        className="font-mono text-[13px] h-10 rounded-xl bg-black/5 dark:bg-white/5 border-transparent flex-1 min-w-[200px]"
+                        className="font-mono text-[13px] h-10 rounded-md bg-muted/50 border-border flex-1 min-w-[200px]"
                       />
                       <Button
                         type="button"
                         variant="outline"
                         onClick={refreshControlUiInfo}
                         disabled={!devModeUnlocked}
-                        className="rounded-xl h-10 px-4 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                        className="rounded-md h-10 px-4 bg-transparent border-border hover:bg-accent/50"
                       >
                         <RefreshCw className="h-4 w-4 mr-2" />
                         {t('common:actions.load')}
@@ -805,7 +805,7 @@ export function Settings() {
                         variant="outline"
                         onClick={handleCopyGatewayToken}
                         disabled={!controlUiInfo?.token}
-                        className="rounded-xl h-10 px-4 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                        className="rounded-md h-10 px-4 bg-transparent border-border hover:bg-accent/50"
                       >
                         <Copy className="h-4 w-4 mr-2" />
                         {t('common:actions.copy')}
@@ -829,14 +829,14 @@ export function Settings() {
                           readOnly
                           value={openclawCliCommand}
                           placeholder={openclawCliError || t('developer.cmdUnavailable')}
-                          className="font-mono text-[13px] h-10 rounded-xl bg-black/5 dark:bg-white/5 border-transparent flex-1 min-w-[200px]"
+                          className="font-mono text-[13px] h-10 rounded-md bg-muted/50 border-border flex-1 min-w-[200px]"
                         />
                         <Button
                           type="button"
                           variant="outline"
                           onClick={handleCopyCliCommand}
                           disabled={!openclawCliCommand}
-                          className="rounded-xl h-10 px-4 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                          className="rounded-md h-10 px-4 bg-transparent border-border hover:bg-accent/50"
                         >
                           <Copy className="h-4 w-4 mr-2" />
                           {t('common:actions.copy')}
@@ -859,7 +859,7 @@ export function Settings() {
                           variant="outline"
                           onClick={() => void handleRunOpenClawDoctor('diagnose')}
                           disabled={doctorRunningMode !== null}
-                          className="rounded-xl h-10 px-4 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                          className="rounded-md h-10 px-4 bg-transparent border-border hover:bg-accent/50"
                         >
                           <RefreshCw className={`h-4 w-4 mr-2${doctorRunningMode === 'diagnose' ? ' animate-spin' : ''}`} />
                           {doctorRunningMode === 'diagnose' ? t('common:status.running') : t('developer.runDoctor')}
@@ -869,7 +869,7 @@ export function Settings() {
                           variant="outline"
                           onClick={() => void handleRunOpenClawDoctor('fix')}
                           disabled={doctorRunningMode !== null}
-                          className="rounded-xl h-10 px-4 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                          className="rounded-md h-10 px-4 bg-transparent border-border hover:bg-accent/50"
                         >
                           <RefreshCw className={`h-4 w-4 mr-2${doctorRunningMode === 'fix' ? ' animate-spin' : ''}`} />
                           {doctorRunningMode === 'fix' ? t('common:status.running') : t('developer.runDoctorFix')}
@@ -879,7 +879,7 @@ export function Settings() {
                           variant="outline"
                           onClick={handleCopyDoctorOutput}
                           disabled={!doctorResult}
-                          className="rounded-xl h-10 px-4 bg-transparent border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+                          className="rounded-md h-10 px-4 bg-transparent border-border hover:bg-accent/50"
                         >
                           <Copy className="h-4 w-4 mr-2" />
                           {t('common:actions.copy')}
@@ -888,17 +888,17 @@ export function Settings() {
                     </div>
 
                     {doctorResult && (
-                      <div className="space-y-3 rounded-2xl border border-black/10 dark:border-white/10 p-5 bg-black/5 dark:bg-white/5">
+                      <div className="space-y-3 rounded-lg border border-border p-5 bg-muted/30">
                         <div className="flex flex-wrap gap-2 text-[12px]">
-                          <Badge variant={doctorResult.success ? 'secondary' : 'destructive'} className="rounded-full px-3 py-1">
+                          <Badge variant={doctorResult.success ? 'secondary' : 'destructive'} className="rounded-md px-3 py-1">
                             {doctorResult.mode === 'fix'
                               ? (doctorResult.success ? t('developer.doctorFixOk') : t('developer.doctorFixIssue'))
                               : (doctorResult.success ? t('developer.doctorOk') : t('developer.doctorIssue'))}
                           </Badge>
-                          <Badge variant="outline" className="rounded-full px-3 py-1">
+                          <Badge variant="outline" className="rounded-md px-3 py-1">
                             {t('developer.doctorExitCode')}: {doctorResult.exitCode ?? 'null'}
                           </Badge>
-                          <Badge variant="outline" className="rounded-full px-3 py-1">
+                          <Badge variant="outline" className="rounded-md px-3 py-1">
                             {t('developer.doctorDuration')}: {Math.round(doctorResult.durationMs)}ms
                           </Badge>
                         </div>
@@ -910,13 +910,13 @@ export function Settings() {
                         <div className="grid gap-3 md:grid-cols-2">
                           <div className="space-y-2">
                             <p className="text-[12px] font-semibold text-foreground/80">{t('developer.doctorStdout')}</p>
-                            <pre className="max-h-72 overflow-auto rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-card p-3 text-[11px] font-mono whitespace-pre-wrap break-words">
+                            <pre className="max-h-72 overflow-auto rounded-md border border-border bg-card p-3 text-[11px] font-mono whitespace-pre-wrap break-words shadow-soft">
                               {doctorResult.stdout.trim() || t('developer.doctorOutputEmpty')}
                             </pre>
                           </div>
                           <div className="space-y-2">
                             <p className="text-[12px] font-semibold text-foreground/80">{t('developer.doctorStderr')}</p>
-                            <pre className="max-h-72 overflow-auto rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-card p-3 text-[11px] font-mono whitespace-pre-wrap break-words">
+                            <pre className="max-h-72 overflow-auto rounded-md border border-border bg-card p-3 text-[11px] font-mono whitespace-pre-wrap break-words shadow-soft">
                               {doctorResult.stderr.trim() || t('developer.doctorOutputEmpty')}
                             </pre>
                           </div>
@@ -1012,7 +1012,7 @@ export function Settings() {
                                 .slice()
                                 .reverse()
                                 .map((entry) => (
-                                  <div key={entry.id} className="rounded-lg border border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 p-3">
+                                  <div key={entry.id} className="rounded-md border border-border bg-muted/30 p-3">
                                     <div className="flex items-center justify-between gap-3 mb-2">
                                       <span className="font-semibold text-foreground">{entry.event}</span>
                                       <span className="text-muted-foreground text-[11px]">{entry.ts}</span>
@@ -1033,11 +1033,11 @@ export function Settings() {
             </>
           )}
 
-          <Separator className="bg-black/5 dark:bg-white/5" />
+          <Separator className="bg-border" />
 
           {/* Updates */}
           <div>
-            <h2 className="text-3xl font-serif text-foreground mb-6 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+            <h2 className="text-2xl text-foreground mb-6 font-semibold tracking-tight">
               {t('updates.title')}
             </h2>
             <div className="space-y-6">
@@ -1074,11 +1074,11 @@ export function Settings() {
             </div>
           </div>
 
-          <Separator className="bg-black/5 dark:bg-white/5" />
+          <Separator className="bg-border" />
 
           {/* About */}
           <div>
-            <h2 className="text-3xl font-serif text-foreground mb-6 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+            <h2 className="text-2xl text-foreground mb-6 font-semibold tracking-tight">
               {t('about.title')}
             </h2>
             <div className="space-y-3 text-[14px] text-muted-foreground">
@@ -1087,29 +1087,6 @@ export function Settings() {
               </p>
               <p>{t('about.basedOn')}</p>
               <p>{t('about.version', { version: currentVersion })}</p>
-              <div className="flex gap-4 pt-3">
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-[14px] text-blue-500 hover:text-blue-600 font-medium"
-                  onClick={() => window.electron.openExternal('https://claw-x.com')}
-                >
-                  {t('about.docs')}
-                </Button>
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-[14px] text-blue-500 hover:text-blue-600 font-medium"
-                  onClick={() => window.electron.openExternal('https://github.com/ValueCell-ai/ClawX')}
-                >
-                  {t('about.github')}
-                </Button>
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-[14px] text-blue-500 hover:text-blue-600 font-medium"
-                  onClick={() => window.electron.openExternal('https://icnnp7d0dymg.feishu.cn/wiki/UyfOwQ2cAiJIP6kqUW8cte5Bnlc')}
-                >
-                  {t('about.faq')}
-                </Button>
-              </div>
             </div>
           </div>
 

@@ -72,7 +72,7 @@ export const ChatMessage = memo(function ChatMessage({
     >
       {/* Avatar */}
       {!isUser && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-black/5 dark:bg-white/5 text-foreground">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md mt-1 bg-muted/30 text-foreground">
           <Sparkles className="h-4 w-4" />
         </div>
       )}
@@ -143,7 +143,7 @@ export const ChatMessage = memo(function ChatMessage({
                 ) : (
                   <div
                     key={`local-${i}`}
-                    className="w-36 h-36 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 flex items-center justify-center text-muted-foreground"
+                    className="w-36 h-36 rounded-lg border border-border bg-muted/30 flex items-center justify-center text-muted-foreground"
                   >
                     <File className="h-8 w-8" />
                   </div>
@@ -204,7 +204,7 @@ export const ChatMessage = memo(function ChatMessage({
               }
               if (isImage && !file.preview) {
                 return (
-                  <div key={`local-${i}`} className="w-36 h-36 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 flex items-center justify-center text-muted-foreground">
+                  <div key={`local-${i}`} className="w-36 h-36 rounded-lg border border-border bg-muted/30 flex items-center justify-center text-muted-foreground">
                     <File className="h-8 w-8" />
                   </div>
                 );
@@ -334,11 +334,11 @@ function MessageBubble({
   return (
     <div
       className={cn(
-        'relative rounded-2xl px-4 py-3',
+        'relative rounded-lg px-4 py-3',
         !isUser && 'w-full',
         isUser
-          ? 'bg-[#0a84ff] text-white shadow-sm'
-          : 'bg-black/5 dark:bg-white/5 text-foreground',
+          ? 'bg-primary text-white shadow-sm'
+          : 'bg-muted/30 text-foreground',
       )}
     >
       {isUser ? (
@@ -359,7 +359,7 @@ function MessageBubble({
                   );
                 }
                 return (
-                  <pre className="bg-background/50 rounded-lg p-4 overflow-x-auto">
+                  <pre className="bg-background/50 rounded-md p-4 overflow-x-auto">
                     <code className={cn('text-sm font-mono', className)} {...props}>
                       {children}
                     </code>
@@ -393,7 +393,7 @@ function ThinkingBlock({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-[14px]">
+    <div className="w-full rounded-lg border border-border bg-muted/30 text-[14px]">
       <button
         className="flex items-center gap-2 w-full px-3 py-2 text-muted-foreground hover:text-foreground transition-colors"
         onClick={() => setExpanded(!expanded)}
@@ -440,8 +440,8 @@ function FileCard({ file }: { file: AttachedFileMeta }) {
   return (
     <div 
       className={cn(
-        "flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 px-3 py-2.5 bg-black/5 dark:bg-white/5 max-w-[220px]",
-        file.filePath && "cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+        "flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 bg-muted/30 max-w-[220px]",
+        file.filePath && "cursor-pointer hover:bg-muted/50 transition-colors"
       )}
       onClick={handleOpen}
       title={file.filePath ? "Open file" : undefined}
@@ -477,7 +477,7 @@ function ImageThumbnail({
   void filePath; void base64; void mimeType;
   return (
     <div
-      className="relative w-36 h-36 rounded-xl border overflow-hidden border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 group/img cursor-zoom-in"
+      className="relative w-36 h-36 rounded-lg border overflow-hidden border-border bg-muted/30 group/img cursor-zoom-in"
       onClick={onPreview}
     >
       <img src={src} alt={fileName} className="w-full h-full object-cover" />
@@ -508,7 +508,7 @@ function ImagePreviewCard({
   void filePath; void base64; void mimeType;
   return (
     <div
-      className="relative max-w-xs rounded-xl border overflow-hidden border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 group/img cursor-zoom-in"
+      className="relative max-w-xs rounded-lg border overflow-hidden border-border bg-muted/30 group/img cursor-zoom-in"
       onClick={onPreview}
     >
       <img src={src} alt={fileName} className="block w-full" />
@@ -603,7 +603,7 @@ function ToolCard({ name, input }: { name: string; input: unknown }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-[14px]">
+    <div className="rounded-lg border border-border bg-muted/30 text-[14px]">
       <button
         className="flex items-center gap-2 w-full px-3 py-1.5 text-muted-foreground hover:text-foreground transition-colors"
         onClick={() => setExpanded(!expanded)}

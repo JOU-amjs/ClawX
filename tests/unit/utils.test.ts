@@ -16,7 +16,7 @@ describe('cn (class name merge)', () => {
   
   it('should merge tailwind classes correctly', () => {
     expect(cn('px-2', 'px-4')).toBe('px-4');
-    expect(cn('text-red-500', 'text-blue-500')).toBe('text-blue-500');
+    expect(cn('text-red-500', 'text-primary')).toBe('text-primary');
   });
 });
 

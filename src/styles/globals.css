@@ -4,15 +4,15 @@
 
 @layer base {
   :root {
-    /* #f1ede1 */
-    --background: 45 36.4% 91.4%;
-    --foreground: 222.2 84% 4.9%;
+    /* Modern Tech / SaaS style - Electric Indigo theme */
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222.2 47.4% 11.2%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --primary: 250 90% 60%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
@@ -23,49 +23,57 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --ring: 250 90% 60%;
+    --radius: 0.375rem;
   }
 
-  /* Neutral deep-gray dark palette */
+  /* Deep OLED-style dark palette with refined contrast */
   .dark {
-    --background: 240 4% 11%;
-    --foreground: 210 20% 96%;
-    --card: 240 3% 14%;
-    --card-foreground: 210 20% 96%;
-    --popover: 240 3% 14%;
-    --popover-foreground: 210 20% 96%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 240 3% 18%;
-    --secondary-foreground: 210 20% 96%;
-    --muted: 240 3% 18%;
-    --muted-foreground: 220 8% 72%;
-    --accent: 240 3% 22%;
-    --accent-foreground: 210 20% 96%;
-    --destructive: 0 65% 42%;
-    --destructive-foreground: 210 20% 96%;
-    --border: 240 3% 24%;
-    --input: 240 3% 18%;
-    --ring: 217.2 91.2% 59.8%;
+    --background: 240 6% 7%;
+    --foreground: 210 20% 98%;
+    --card: 240 5% 10%;
+    --card-foreground: 210 20% 98%;
+    --popover: 240 5% 10%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 250 95% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 220 8% 70%;
+    --accent: 240 4% 20%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 240 4% 18%;
+    --input: 240 4% 16%;
+    --ring: 250 95% 65%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Microsoft YaHei", "微软雅黑", sans-serif;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Microsoft YaHei", "微软雅黑", sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Modern heading styles - override component-level serif fonts */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Microsoft YaHei", "微软雅黑", sans-serif;
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - refined minimal style */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -73,11 +81,11 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-border rounded-full;
+  @apply bg-border rounded;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/30;
+  @apply bg-muted-foreground/40;
 }
 
 /* macOS traffic light spacing */
@@ -94,9 +102,26 @@
   @apply transition-colors duration-200;
 }
 
-/* Focus ring */
+/* Focus ring - subtle modern style */
 .focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
+  @apply focus:outline-none focus:ring-2 focus:ring-ring/50 focus:ring-offset-1 focus:ring-offset-background;
+}
+
+/* Modern button base style - reduces need for component-level rounded-full */
+.btn-modern {
+  @apply rounded-md font-medium transition-all duration-150;
+}
+
+/* Modern card style - refined borders and shadows */
+.card-modern {
+  @apply rounded-lg border bg-card text-card-foreground shadow-sm;
+}
+
+/* Modern input style */
+.input-modern {
+  @apply rounded-md border bg-background px-3 py-2 text-sm ring-offset-background transition-colors;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1;
+  @apply placeholder:text-muted-foreground/60;
 }
 
 /* Prose styling for markdown */

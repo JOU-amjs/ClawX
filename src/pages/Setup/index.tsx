@@ -1172,7 +1172,7 @@ function ProviderContent({
               href={effectiveProviderDocsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[13px] text-blue-500 hover:text-blue-600 font-medium inline-flex items-center gap-1"
+              className="text-[13px] text-primary hover:text-primary font-medium inline-flex items-center gap-1"
             >
               {t('settings:aiProviders.dialog.customDoc')}
               <ExternalLink className="h-3 w-3" />
@@ -1274,7 +1274,7 @@ function ProviderContent({
                     href={selectedProviderData.codePlanDocsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[13px] text-blue-500 hover:text-blue-600 font-medium inline-flex items-center gap-1"
+                    className="text-[13px] text-primary hover:text-primary font-medium inline-flex items-center gap-1"
                   >
                     {t('provider.codePlanDoc')}
                     <ExternalLink className="h-3 w-3" />
@@ -1477,14 +1477,14 @@ function ProviderContent({
           {/* Device OAuth Trigger */}
           {useOAuthFlow && (
             <div className="space-y-4 pt-2">
-              <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4 text-center">
+              <div className="rounded-lg bg-primary/10 border border-primary/20 p-4 text-center">
                 <p className="text-sm text-blue-200 mb-3 block">
                   This provider requires signing in via your browser.
                 </p>
                 <Button
                   onClick={handleStartOAuth}
                   disabled={oauthFlowing}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  className="w-full bg-primary hover:bg-blue-700 text-white"
                 >
                   {oauthFlowing ? (
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Waiting...</>
@@ -1540,7 +1540,7 @@ function ProviderContent({
                         />
 
                         <Button
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                          className="w-full bg-primary hover:bg-blue-700 text-white"
                           onClick={handleSubmitManualOAuthCode}
                           disabled={!manualCodeInput.trim()}
                         >
