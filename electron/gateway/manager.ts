@@ -112,8 +112,16 @@ export class GatewayManager extends EventEmitter {
   private static readonly HEARTBEAT_INTERVAL_MS = 30_000;
   private static readonly HEARTBEAT_TIMEOUT_MS = 12_000;
   private static readonly HEARTBEAT_MAX_MISSES = 3;
+  // Windows-specific heartbeat parameters — more lenient to reduce log noise
+  // from false positives caused by Windows Defender scans, system updates,
+  // and synchronous event-loop blocking in the gateway.
+  private static readonly HEARTBEAT_INTERVAL_MS_WIN = 60_000;
+  private static readonly HEARTBEAT_TIMEOUT_MS_WIN = 25_000;
+  private static readonly HEARTBEAT_MAX_MISSES_WIN = 5;
   public static readonly RESTART_COOLDOWN_MS = 5_000;
   private lastRestartAt = 0;
+  /** Set by scheduleReconnect() before calling start() to signal auto-reconnect. */
+  private isAutoReconnectStart = false;
 
   constructor(config?: Partial<ReconnectConfig>) {
     super();
@@ -225,8 +233,14 @@ export class GatewayManager extends EventEmitter {
       logger.debug('Cleared pending reconnect timer because start was requested manually');
     }
 
-    this.reconnectAttempts = 0;
-    this.setStatus({ state: 'starting', reconnectAttempts: 0 });
+    // Only reset reconnectAttempts on manual start, not on auto-reconnect.
+    // Auto-reconnect calls start() via scheduleReconnect(); those should
+    // accumulate attempts so the maxAttempts cap works correctly.
+    if (!this.isAutoReconnectStart) {
+      this.reconnectAttempts = 0;
+    }
+    this.isAutoReconnectStart = false; // consume the flag
+    this.setStatus({ state: 'starting', reconnectAttempts: this.reconnectAttempts });
 
     // Check if Python environment is ready (self-healing) asynchronously.
     // Fire-and-forget: only needs to run once, not on every retry.
@@ -374,6 +388,7 @@ export class GatewayManager extends EventEmitter {
     clearPendingGatewayRequests(this.pendingRequests, new Error('Gateway stopped'));
 
     this.restartController.resetDeferredRestart();
+    this.isAutoReconnectStart = false;
     this.setStatus({ state: 'stopped', error: undefined, pid: undefined, connectedAt: undefined, uptime: undefined });
   }
 
@@ -890,40 +905,41 @@ export class GatewayManager extends EventEmitter {
    * Start ping interval to keep connection alive
    */
   private startPing(): void {
+    const isWindows = process.platform === 'win32';
     this.connectionMonitor.startPing({
-      intervalMs: GatewayManager.HEARTBEAT_INTERVAL_MS,
-      timeoutMs: GatewayManager.HEARTBEAT_TIMEOUT_MS,
-      maxConsecutiveMisses: GatewayManager.HEARTBEAT_MAX_MISSES,
+      intervalMs: isWindows
+        ? GatewayManager.HEARTBEAT_INTERVAL_MS_WIN
+        : GatewayManager.HEARTBEAT_INTERVAL_MS,
+      timeoutMs: isWindows
+        ? GatewayManager.HEARTBEAT_TIMEOUT_MS_WIN
+        : GatewayManager.HEARTBEAT_TIMEOUT_MS,
+      maxConsecutiveMisses: isWindows
+        ? GatewayManager.HEARTBEAT_MAX_MISSES_WIN
+        : GatewayManager.HEARTBEAT_MAX_MISSES,
       sendPing: () => {
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.ping();
         }
       },
       onHeartbeatTimeout: ({ consecutiveMisses, timeoutMs }) => {
-        if (this.status.state !== 'running' || !this.shouldReconnect) {
-          return;
-        }
-        const ws = this.ws;
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-          return;
-        }
-
+        // Heartbeat timeout is observability-only.  We intentionally do NOT
+        // terminate the socket or trigger reconnection here because:
+        //
+        // 1. If the gateway process dies → child.on('exit') fires reliably.
+        // 2. If the socket disconnects  → ws.on('close') fires reliably.
+        // 3. If the gateway event loop is blocked (skills scanning, GC,
+        //    antivirus) → pong is delayed but the process and connection
+        //    are still valid.  Terminating the socket would cause a
+        //    cascading restart loop for no reason.
+        //
+        // The only scenario ping/pong could catch (silent half-open TCP on
+        // localhost) is practically impossible.  So we just log.
+        const pid = this.process?.pid ?? 'unknown';
         logger.warn(
-          `Gateway heartbeat timed out after ${consecutiveMisses} consecutive misses (timeout=${timeoutMs}ms); terminating stale socket`,
+          `Gateway heartbeat: ${consecutiveMisses} consecutive pong misses ` +
+            `(timeout=${timeoutMs}ms, pid=${pid}, state=${this.status.state}). ` +
+            `No action taken — relying on process exit and socket close events.`,
         );
-        try {
-          ws.terminate();
-        } catch (error) {
-          logger.warn('Failed to terminate stale Gateway socket after heartbeat timeout:', error);
-        }
-
-        // On Windows, onCloseAfterHandshake intentionally skips scheduleReconnect()
-        // to avoid double-reconnect races with the process exit handler.  However,
-        // a heartbeat timeout means the socket is stale while the process may still
-        // be alive (no exit event), so we must explicitly trigger reconnect here.
-        if (process.platform === 'win32') {
-          this.scheduleReconnect();
-        }
       },
     });
   }
@@ -988,6 +1004,7 @@ export class GatewayManager extends EventEmitter {
       try {
         // Use the guarded start() flow so reconnect attempts cannot bypass
         // lifecycle locking and accidentally start duplicate Gateway processes.
+        this.isAutoReconnectStart = true;
         await this.start();
         this.reconnectSuccessTotal += 1;
         this.emitReconnectMetric('success', {

@@ -1,6 +1,6 @@
 {
     "name": "clawx",
-    "version": "0.3.4",
+    "version": "0.3.6",
     "pnpm": {
         "onlyBuiltDependencies": [
             "@discordjs/opus",
@@ -79,7 +79,7 @@
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@larksuite/openclaw-lark": "2026.3.30",
+        "@larksuite/openclaw-lark": "2026.3.31",
         "@radix-ui/react-dialog": "^1.1.15",
         "@radix-ui/react-dropdown-menu": "^2.1.16",
         "@radix-ui/react-label": "^2.1.8",
@@ -94,7 +94,6 @@
         "@radix-ui/react-tooltip": "^1.2.8",
         "@playwright/test": "^1.56.1",
         "@soimy/dingtalk": "^3.5.1",
-        "@tencent-connect/openclaw-qqbot": "^1.6.7",
         "@tencent-weixin/openclaw-weixin": "^2.1.1",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/react": "^16.3.2",
@@ -120,7 +119,7 @@
         "i18next": "^25.8.11",
         "jsdom": "^28.1.0",
         "lucide-react": "^0.563.0",
-        "openclaw": "2026.3.28",
+        "openclaw": "2026.4.1",
         "png2icons": "^2.0.1",
         "postcss": "^8.5.6",
         "react": "^19.2.4",

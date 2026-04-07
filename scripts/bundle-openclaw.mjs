@@ -266,6 +266,65 @@ for (const [realPath, pkgName] of collected) {
   }
 }
 
+// 5b. Merge built-in extension node_modules into top-level node_modules
+//
+// OpenClaw 3.31+ ships built-in extensions (telegram, discord, etc.) under
+// dist/extensions/<ext>/node_modules/.  The Rollup bundler creates shared
+// chunks at dist/ root (e.g. sticker-cache-*.js) that eagerly import
+// extension-specific packages like "grammy".  Node.js resolves bare
+// specifiers from the importing file's directory upward:
+//   dist/ → openclaw/ → openclaw/node_modules/
+// It does NOT search dist/extensions/telegram/node_modules/.
+//
+// Fix: copy extension deps into the top-level node_modules/ so they are
+// resolvable from shared chunks.  Skip-if-exists preserves version priority
+// (openclaw's own deps take precedence over extension deps).
+const extensionsDir = path.join(OUTPUT, 'dist', 'extensions');
+let mergedExtCount = 0;
+if (fs.existsSync(extensionsDir)) {
+  for (const extEntry of fs.readdirSync(extensionsDir, { withFileTypes: true })) {
+    if (!extEntry.isDirectory()) continue;
+    const extNM = path.join(extensionsDir, extEntry.name, 'node_modules');
+    if (!fs.existsSync(extNM)) continue;
+
+    for (const pkgEntry of fs.readdirSync(extNM, { withFileTypes: true })) {
+      if (!pkgEntry.isDirectory() || pkgEntry.name === '.bin') continue;
+      const srcPkg = path.join(extNM, pkgEntry.name);
+
+      if (pkgEntry.name.startsWith('@')) {
+        // Scoped package — iterate sub-entries
+        let scopeEntries;
+        try { scopeEntries = fs.readdirSync(srcPkg, { withFileTypes: true }); } catch { continue; }
+        for (const scopeEntry of scopeEntries) {
+          if (!scopeEntry.isDirectory()) continue;
+          const scopedName = `${pkgEntry.name}/${scopeEntry.name}`;
+          if (copiedNames.has(scopedName)) continue;
+          const srcScoped = path.join(srcPkg, scopeEntry.name);
+          const destScoped = path.join(outputNodeModules, pkgEntry.name, scopeEntry.name);
+          try {
+            fs.mkdirSync(normWin(path.dirname(destScoped)), { recursive: true });
+            fs.cpSync(normWin(srcScoped), normWin(destScoped), { recursive: true, dereference: true });
+            copiedNames.add(scopedName);
+            mergedExtCount++;
+          } catch { /* skip on copy error */ }
+        }
+      } else {
+        if (copiedNames.has(pkgEntry.name)) continue;
+        const destPkg = path.join(outputNodeModules, pkgEntry.name);
+        try {
+          fs.cpSync(normWin(srcPkg), normWin(destPkg), { recursive: true, dereference: true });
+          copiedNames.add(pkgEntry.name);
+          mergedExtCount++;
+        } catch { /* skip on copy error */ }
+      }
+    }
+  }
+}
+
+if (mergedExtCount > 0) {
+  echo`   Merged ${mergedExtCount} extension packages into top-level node_modules`;
+}
+
 // 6. Clean up the bundle to reduce package size
 //
 // This removes platform-agnostic waste: dev artifacts, docs, source maps,
@@ -458,34 +517,7 @@ function patchBrokenModules(nodeModulesDir) {
     ].join('\n'),
   };
   const replacePatches = [
-    {
-      rel: '@mariozechner/pi-coding-agent/dist/core/bash-executor.js',
-      search: `        const child = spawn(shell, [...args, command], {
-            detached: true,
-            env: getShellEnv(),
-            stdio: ["ignore", "pipe", "pipe"],
-        });`,
-      replace: `        const child = spawn(shell, [...args, command], {
-            detached: true,
-            env: getShellEnv(),
-            stdio: ["ignore", "pipe", "pipe"],
-            windowsHide: true,
-        });`,
-    },
-    {
-      rel: '@mariozechner/pi-coding-agent/dist/core/exec.js',
-      search: `        const proc = spawn(command, args, {
-            cwd,
-            shell: false,
-            stdio: ["ignore", "pipe", "pipe"],
-        });`,
-      replace: `        const proc = spawn(command, args, {
-            cwd,
-            shell: false,
-            stdio: ["ignore", "pipe", "pipe"],
-            windowsHide: true,
-        });`,
-    },
+    // Note: @mariozechner/pi-coding-agent is no longer a dep of openclaw 3.31.
   ];
 
   let count = 0;
@@ -671,76 +703,9 @@ function patchBundledRuntime(outputDir) {
 \t\t}) ? { shell: true } : {}
 \t});`,
     },
-    {
-      label: 'agent scope command runner',
-      target: () => findFirstFileByName(path.join(outputDir, 'dist', 'plugin-sdk'), /^agent-scope-.*\.js$/),
-      search: `\tconst child = spawn(resolvedCommand, finalArgv.slice(1), {
-\t\tstdio,
-\t\tcwd,
-\t\tenv: resolvedEnv,
-\t\twindowsVerbatimArguments,
-\t\t...shouldSpawnWithShell({
-\t\t\tresolvedCommand,
-\t\t\tplatform: process$1.platform
-\t\t}) ? { shell: true } : {}
-\t});`,
-      replace: `\tconst child = spawn(resolvedCommand, finalArgv.slice(1), {
-\t\tstdio,
-\t\tcwd,
-\t\tenv: resolvedEnv,
-\t\twindowsVerbatimArguments,
-\t\twindowsHide: true,
-\t\t...shouldSpawnWithShell({
-\t\t\tresolvedCommand,
-\t\t\tplatform: process$1.platform
-\t\t}) ? { shell: true } : {}
-\t});`,
-    },
-    {
-      label: 'chrome launcher',
-      target: () => findFirstFileByName(path.join(outputDir, 'dist', 'plugin-sdk'), /^chrome-.*\.js$/),
-      search: `\t\treturn spawn(exe.path, args, {
-\t\t\tstdio: "pipe",
-\t\t\tenv: {
-\t\t\t\t...process.env,
-\t\t\t\tHOME: os.homedir()
-\t\t\t}
-\t\t});`,
-      replace: `\t\treturn spawn(exe.path, args, {
-\t\t\tstdio: "pipe",
-\t\t\twindowsHide: true,
-\t\t\tenv: {
-\t\t\t\t...process.env,
-\t\t\t\tHOME: os.homedir()
-\t\t\t}
-\t\t});`,
-    },
-    {
-      label: 'qmd runner',
-      target: () => findFirstFileByName(path.join(outputDir, 'dist', 'plugin-sdk'), /^qmd-manager-.*\.js$/),
-      search: `\t\t\tconst child = spawn(resolveWindowsCommandShim(this.qmd.command), args, {
-\t\t\t\tenv: this.env,
-\t\t\t\tcwd: this.workspaceDir
-\t\t\t});`,
-      replace: `\t\t\tconst child = spawn(resolveWindowsCommandShim(this.qmd.command), args, {
-\t\t\t\tenv: this.env,
-\t\t\t\tcwd: this.workspaceDir,
-\t\t\t\twindowsHide: true
-\t\t\t});`,
-    },
-    {
-      label: 'mcporter runner',
-      target: () => findFirstFileByName(path.join(outputDir, 'dist', 'plugin-sdk'), /^qmd-manager-.*\.js$/),
-      search: `\t\t\tconst child = spawn(resolveWindowsCommandShim("mcporter"), args, {
-\t\t\t\tenv: this.env,
-\t\t\t\tcwd: this.workspaceDir
-\t\t\t});`,
-      replace: `\t\t\tconst child = spawn(resolveWindowsCommandShim("mcporter"), args, {
-\t\t\t\tenv: this.env,
-\t\t\t\tcwd: this.workspaceDir,
-\t\t\t\twindowsHide: true
-\t\t\t});`,
-    },
+    // Note: OpenClaw 3.31 removed the hash-suffixed agent-scope-*.js, chrome-*.js,
+    // and qmd-manager-*.js files from dist/plugin-sdk/. Patches for those spawn
+    // sites are no longer needed — the runtime now uses windowsHide natively.
   ];
 
   let count = 0;

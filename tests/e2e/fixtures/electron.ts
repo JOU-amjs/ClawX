@@ -9,6 +9,12 @@ type LaunchElectronOptions = {
   skipSetup?: boolean;
 };
 
+type IpcMockConfig = {
+  gatewayStatus?: Record<string, unknown>;
+  gatewayRpc?: Record<string, unknown>;
+  hostApi?: Record<string, unknown>;
+};
+
 type ElectronFixtures = {
   electronApp: ElectronApplication;
   page: Page;
@@ -194,3 +200,57 @@ export async function completeSetup(page: Page): Promise<void> {
 export { closeElectronApp };
 export { getStableWindow };
 export { expect };
+
+export async function installIpcMocks(
+  app: ElectronApplication,
+  config: IpcMockConfig,
+): Promise<void> {
+  await app.evaluate(
+    async ({ app: _app }, mockConfig) => {
+      const { ipcMain } = process.mainModule!.require('electron') as typeof import('electron');
+      const stableStringify = (value: unknown): string => {
+        if (value == null || typeof value !== 'object') return JSON.stringify(value);
+        if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+        const entries = Object.entries(value as Record<string, unknown>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`);
+        return `{${entries.join(',')}}`;
+      };
+
+      if (mockConfig.gatewayRpc) {
+        ipcMain.removeHandler('gateway:rpc');
+        ipcMain.handle('gateway:rpc', async (_event: unknown, method: string, payload: unknown) => {
+          const key = stableStringify([method, payload ?? null]);
+          if (key in mockConfig.gatewayRpc!) {
+            return mockConfig.gatewayRpc![key];
+          }
+          const fallbackKey = stableStringify([method, null]);
+          if (fallbackKey in mockConfig.gatewayRpc!) {
+            return mockConfig.gatewayRpc![fallbackKey];
+          }
+          return { success: true, result: {} };
+        });
+      }
+
+      if (mockConfig.hostApi) {
+        ipcMain.removeHandler('hostapi:fetch');
+        ipcMain.handle('hostapi:fetch', async (_event: unknown, request: { path?: string; method?: string }) => {
+          const key = stableStringify([request?.path ?? '', request?.method ?? 'GET']);
+          if (key in mockConfig.hostApi!) {
+            return mockConfig.hostApi![key];
+          }
+          return {
+            ok: true,
+            data: { status: 200, ok: true, json: {} },
+          };
+        });
+      }
+
+      if (mockConfig.gatewayStatus) {
+        ipcMain.removeHandler('gateway:status');
+        ipcMain.handle('gateway:status', async () => mockConfig.gatewayStatus);
+      }
+    },
+    config,
+  );
+}

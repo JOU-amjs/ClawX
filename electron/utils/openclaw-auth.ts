@@ -225,6 +225,7 @@ const BUILTIN_CHANNEL_IDS = new Set([
   'msteams',
   'googlechat',
   'mattermost',
+  'qqbot',
 ]);
 const AUTH_PROFILE_PROVIDER_KEY_MAP: Record<string, string> = {
   'openai-codex': 'openai',
@@ -790,23 +791,66 @@ function removeLegacyMoonshotProviderEntry(
   return false;
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function removeLegacyMoonshotKimiSearchConfig(config: Record<string, unknown>): boolean {
+  const tools = isPlainRecord(config.tools) ? config.tools : null;
+  const web = tools && isPlainRecord(tools.web) ? tools.web : null;
+  const search = web && isPlainRecord(web.search) ? web.search : null;
+  if (!search || !('kimi' in search)) return false;
+
+  delete search.kimi;
+  if (Object.keys(search).length === 0) {
+    delete web.search;
+  }
+  if (Object.keys(web).length === 0) {
+    delete tools.web;
+  }
+  if (Object.keys(tools).length === 0) {
+    delete config.tools;
+  }
+  return true;
+}
+
+function upsertMoonshotWebSearchConfig(
+  config: Record<string, unknown>,
+  legacyKimi?: Record<string, unknown>,
+): void {
+  const plugins = isPlainRecord(config.plugins)
+    ? config.plugins
+    : (Array.isArray(config.plugins) ? { load: [...config.plugins] } : {});
+  const entries = isPlainRecord(plugins.entries) ? plugins.entries : {};
+  const moonshot = isPlainRecord(entries[OPENCLAW_PROVIDER_KEY_MOONSHOT])
+    ? entries[OPENCLAW_PROVIDER_KEY_MOONSHOT] as Record<string, unknown>
+    : {};
+  const moonshotConfig = isPlainRecord(moonshot.config) ? moonshot.config as Record<string, unknown> : {};
+  const currentWebSearch = isPlainRecord(moonshotConfig.webSearch)
+    ? moonshotConfig.webSearch as Record<string, unknown>
+    : {};
+
+  const nextWebSearch = { ...(legacyKimi || {}), ...currentWebSearch };
+  delete nextWebSearch.apiKey;
+  nextWebSearch.baseUrl = 'https://api.moonshot.cn/v1';
+
+  moonshotConfig.webSearch = nextWebSearch;
+  moonshot.config = moonshotConfig;
+  entries[OPENCLAW_PROVIDER_KEY_MOONSHOT] = moonshot;
+  plugins.entries = entries;
+  config.plugins = plugins;
+}
+
 function ensureMoonshotKimiWebSearchCnBaseUrl(config: Record<string, unknown>, provider: string): void {
   if (provider !== OPENCLAW_PROVIDER_KEY_MOONSHOT) return;
 
-  const tools = (config.tools || {}) as Record<string, unknown>;
-  const web = (tools.web || {}) as Record<string, unknown>;
-  const search = (web.search || {}) as Record<string, unknown>;
-  const kimi = (search.kimi && typeof search.kimi === 'object' && !Array.isArray(search.kimi))
-    ? (search.kimi as Record<string, unknown>)
-    : {};
+  const tools = isPlainRecord(config.tools) ? config.tools : null;
+  const web = tools && isPlainRecord(tools.web) ? tools.web : null;
+  const search = web && isPlainRecord(web.search) ? web.search : null;
+  const legacyKimi = search && isPlainRecord(search.kimi) ? search.kimi : undefined;
 
-  // Prefer env/auth-profiles for key resolution; stale inline kimi.apiKey can cause persistent 401.
-  delete kimi.apiKey;
-  kimi.baseUrl = 'https://api.moonshot.cn/v1';
-  search.kimi = kimi;
-  web.search = search;
-  tools.web = web;
-  config.tools = tools;
+  upsertMoonshotWebSearchConfig(config, legacyKimi);
+  removeLegacyMoonshotKimiSearchConfig(config);
 }
 
 /**
@@ -1371,24 +1415,43 @@ export async function sanitizeOpenClawConfig(): Promise<void> {
     }
 
     // ── tools.web.search.kimi ─────────────────────────────────────
-    // OpenClaw web_search(kimi) prioritizes tools.web.search.kimi.apiKey over
-    // environment/auth-profiles. A stale inline key can cause persistent 401s.
-    // When ClawX-managed moonshot provider exists, prefer centralized key
-    // resolution and strip the inline key.
+    // OpenClaw moved moonshot web search config under
+    // plugins.entries.moonshot.config.webSearch. Migrate the old key and strip
+    // any inline apiKey so auth-profiles/env remain the single source of truth.
     const providers = ((config.models as Record<string, unknown> | undefined)?.providers as Record<string, unknown> | undefined) || {};
     if (providers[OPENCLAW_PROVIDER_KEY_MOONSHOT]) {
-      const tools = (config.tools as Record<string, unknown> | undefined) || {};
-      const web = (tools.web as Record<string, unknown> | undefined) || {};
-      const search = (web.search as Record<string, unknown> | undefined) || {};
-      const kimi = (search.kimi as Record<string, unknown> | undefined) || {};
-      if ('apiKey' in kimi) {
-        console.log('[sanitize] Removing stale key "tools.web.search.kimi.apiKey" from openclaw.json');
-        delete kimi.apiKey;
-        search.kimi = kimi;
-        web.search = search;
-        tools.web = web;
-        config.tools = tools;
+      const tools = isPlainRecord(config.tools) ? config.tools : null;
+      const web = tools && isPlainRecord(tools.web) ? tools.web : null;
+      const search = web && isPlainRecord(web.search) ? web.search : null;
+      const legacyKimi = search && isPlainRecord(search.kimi) ? search.kimi : undefined;
+      const hadInlineApiKey = Boolean(legacyKimi && 'apiKey' in legacyKimi);
+      const hadLegacyKimi = Boolean(legacyKimi);
+
+      if (legacyKimi) {
+        upsertMoonshotWebSearchConfig(config, legacyKimi);
+        removeLegacyMoonshotKimiSearchConfig(config);
         modified = true;
+        console.log('[sanitize] Migrated legacy "tools.web.search.kimi" to "plugins.entries.moonshot.config.webSearch"');
+      } else {
+        const plugins = isPlainRecord(config.plugins) ? config.plugins : null;
+        const entries = plugins && isPlainRecord(plugins.entries) ? plugins.entries : null;
+        const moonshot = entries && isPlainRecord(entries[OPENCLAW_PROVIDER_KEY_MOONSHOT])
+          ? entries[OPENCLAW_PROVIDER_KEY_MOONSHOT] as Record<string, unknown>
+          : null;
+        const moonshotConfig = moonshot && isPlainRecord(moonshot.config) ? moonshot.config as Record<string, unknown> : null;
+        const webSearch = moonshotConfig && isPlainRecord(moonshotConfig.webSearch)
+          ? moonshotConfig.webSearch as Record<string, unknown>
+          : null;
+        if (webSearch && 'apiKey' in webSearch) {
+          delete webSearch.apiKey;
+          moonshotConfig!.webSearch = webSearch;
+          modified = true;
+        }
+      }
+      if (hadInlineApiKey) {
+        console.log('[sanitize] Removing stale key "tools.web.search.kimi.apiKey" from openclaw.json');
+      } else if (hadLegacyKimi) {
+        console.log('[sanitize] Removing legacy key "tools.web.search.kimi" from openclaw.json');
       }
     }
 
@@ -1510,33 +1573,20 @@ export async function sanitizeOpenClawConfig(): Promise<void> {
         modified = true;
       }
 
-      // ── qqbot → openclaw-qqbot migration ────────────────────────
-      // The qqbot npm package (@tencent-connect/openclaw-qqbot) declares
-      // id="openclaw-qqbot" in its manifest, but older ClawX versions
-      // wrote bare "qqbot" into plugins.allow.  Migrate to the manifest ID
-      // so the Gateway can resolve the plugin correctly.
-      const LEGACY_QQBOT_ID = 'qqbot';
-      const NEW_QQBOT_ID = 'openclaw-qqbot';
-      if (Array.isArray(pluginsObj.allow)) {
-        const allowArr = pluginsObj.allow as string[];
-        const legacyIdx = allowArr.indexOf(LEGACY_QQBOT_ID);
-        if (legacyIdx !== -1) {
-          if (!allowArr.includes(NEW_QQBOT_ID)) {
-            allowArr[legacyIdx] = NEW_QQBOT_ID;
-          } else {
-            allowArr.splice(legacyIdx, 1);
-          }
-          console.log(`[sanitize] Migrated plugins.allow: ${LEGACY_QQBOT_ID} → ${NEW_QQBOT_ID}`);
+      // ── qqbot built-in channel cleanup ──────────────────────────
+      // OpenClaw 3.31 moved qqbot from a third-party plugin to a built-in
+      // channel.  Clean up legacy plugin entries (both bare "qqbot" and
+      // manifest-declared "openclaw-qqbot") from plugins.entries.
+      // plugins.allow is left untouched — having openclaw-qqbot there is harmless.
+      // The channel config under channels.qqbot is preserved and works
+      // identically with the built-in channel.
+      const QQBOT_PLUGIN_IDS = ['qqbot', 'openclaw-qqbot'] as const;
+      for (const qqbotId of QQBOT_PLUGIN_IDS) {
+        if (pEntries?.[qqbotId]) {
+          delete pEntries[qqbotId];
+          console.log(`[sanitize] Removed built-in channel plugin from plugins.entries: ${qqbotId}`);
           modified = true;
         }
-      }
-      if (pEntries?.[LEGACY_QQBOT_ID]) {
-        if (!pEntries[NEW_QQBOT_ID]) {
-          pEntries[NEW_QQBOT_ID] = pEntries[LEGACY_QQBOT_ID];
-        }
-        delete pEntries[LEGACY_QQBOT_ID];
-        console.log(`[sanitize] Migrated plugins.entries: ${LEGACY_QQBOT_ID} → ${NEW_QQBOT_ID}`);
-        modified = true;
       }
 
       // ── qwen-portal → modelstudio migration ────────────────────
