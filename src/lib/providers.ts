@@ -186,8 +186,8 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
     showBaseUrl: true,
     showModelId: true,
     modelIdPlaceholder: 'your-provider/model-id',
-    docsUrl: 'https://icnnp7d0dymg.feishu.cn/wiki/BmiLwGBcEiloZDkdYnGc8RWnn6d#Ee1ldfvKJoVGvfxc32mcILwenth',
-    docsUrlZh: 'https://icnnp7d0dymg.feishu.cn/wiki/BmiLwGBcEiloZDkdYnGc8RWnn6d#IWQCdfe5fobGU3xf3UGcgbLynGh',
+    docsUrl: 'https://my.feishu.cn/docx/OVPtd5y54oaTTkxFCbfc4re9nie',
+    docsUrlZh: 'https://my.feishu.cn/docx/OVPtd5y54oaTTkxFCbfc4re9nie',
   },
 ];
 
