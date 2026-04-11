@@ -95,6 +95,19 @@ export function Settings() {
   const [wsDiagnosticEnabled, setWsDiagnosticEnabled] = useState(false);
   const [showTelemetryViewer, setShowTelemetryViewer] = useState(false);
   const [telemetryEntries, setTelemetryEntries] = useState<UiTelemetryEntry[]>([]);
+  const [isPortable, setIsPortable] = useState(false);
+
+  useEffect(() => {
+    const checkPortable = async () => {
+      try {
+        const portable = await invokeIpc<boolean>('app:isPortable');
+        setIsPortable(portable);
+      } catch (error) {
+        console.error('Failed to check portable mode:', error);
+      }
+    };
+    checkPortable();
+  }, []);
 
   const isWindows = window.electron.platform === 'win32';
   const showCliTools = true;
@@ -1033,46 +1046,49 @@ export function Settings() {
             </>
           )}
 
-          <Separator className="bg-border" />
-
           {/* Updates */}
-          <div>
-            <h2 className="text-2xl text-foreground mb-6 font-semibold tracking-tight">
-              {t('updates.title')}
-            </h2>
-            <div className="space-y-6">
-              <UpdateSettings />
+          {!isPortable && (
+          <>
+            <Separator className="bg-border" />
+            <div>
+              <h2 className="text-2xl text-foreground mb-6 font-semibold tracking-tight">
+                {t('updates.title')}
+              </h2>
+              <div className="space-y-6">
+                <UpdateSettings />
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-[15px] font-medium text-foreground">{t('updates.autoCheck')}</Label>
-                  <p className="text-[13px] text-muted-foreground mt-1">
-                    {t('updates.autoCheckDesc')}
-                  </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-[15px] font-medium text-foreground">{t('updates.autoCheck')}</Label>
+                    <p className="text-[13px] text-muted-foreground mt-1">
+                      {t('updates.autoCheckDesc')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={autoCheckUpdate}
+                    onCheckedChange={setAutoCheckUpdate}
+                  />
                 </div>
-                <Switch
-                  checked={autoCheckUpdate}
-                  onCheckedChange={setAutoCheckUpdate}
-                />
-              </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-[15px] font-medium text-foreground">{t('updates.autoDownload')}</Label>
-                  <p className="text-[13px] text-muted-foreground mt-1">
-                    {t('updates.autoDownloadDesc')}
-                  </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-[15px] font-medium text-foreground">{t('updates.autoDownload')}</Label>
+                    <p className="text-[13px] text-muted-foreground mt-1">
+                      {t('updates.autoDownloadDesc')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={autoDownloadUpdate}
+                    onCheckedChange={(value) => {
+                      setAutoDownloadUpdate(value);
+                      updateSetAutoDownload(value);
+                    }}
+                  />
                 </div>
-                <Switch
-                  checked={autoDownloadUpdate}
-                  onCheckedChange={(value) => {
-                    setAutoDownloadUpdate(value);
-                    updateSetAutoDownload(value);
-                  }}
-                />
               </div>
             </div>
-          </div>
+          </>
+          )}
 
           <Separator className="bg-border" />
 

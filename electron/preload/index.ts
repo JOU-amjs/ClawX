@@ -44,6 +44,7 @@ const electronAPI = {
         'app:platform',
         'app:quit',
         'app:relaunch',
+        'app:isPortable',
         'app:request',
         // Window controls
         'window:minimize',

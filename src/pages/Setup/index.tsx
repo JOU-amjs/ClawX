@@ -110,7 +110,7 @@ import {
   hasConfiguredCredentials,
   pickPreferredAccount,
 } from '@/lib/provider-accounts';
-import clawxIcon from '@/assets/logo.svg';
+import clawxIcon from '@/assets/logo.png';
 
 // Use the shared provider registry for setup providers
 const providers = SETUP_PROVIDERS;

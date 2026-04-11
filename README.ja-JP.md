@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="src/assets/logo.svg" width="128" height="128" alt="ClawX Logo" />
+  <img src="src/assets/logo.png" width="128" height="128" alt="ClawX Logo" />
 </p>
 
 <h1 align="center">ClawX</h1>

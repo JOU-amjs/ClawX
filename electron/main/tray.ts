@@ -68,7 +68,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
   // Create context menu
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show ClawX',
+      label: 'Show DragonClaw',
       click: showWindow,
     },
     {
@@ -122,7 +122,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
       type: 'separator',
     },
     {
-      label: 'Quit ClawX',
+      label: 'Quit DragonClaw',
       click: () => {
         app.quit();
       },
