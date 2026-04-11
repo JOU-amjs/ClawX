@@ -251,6 +251,7 @@ export class GatewayManager extends EventEmitter {
         port: this.status.port,
         ownedPid: this.process?.pid,
         shouldWaitForPortFree: process.platform === 'win32',
+        hasOwnedProcess: () => this.process?.pid != null && this.ownsProcess,
         resetStartupStderrLines: () => {
           this.recentStartupStderrLines = [];
         },
@@ -278,6 +279,15 @@ export class GatewayManager extends EventEmitter {
           if (!isOwnProcess) {
             this.ownsProcess = false;
             this.setStatus({ pid: undefined });
+          }
+
+          // Treat a successful reconnect to the owned process as a restart
+          // completion (e.g. after a Gateway code-1012 in-process restart).
+          // This updates lastRestartCompletedAt so that flushDeferredRestart
+          // drops any deferred restart requested before this reconnect,
+          // avoiding a redundant kill+respawn cycle.
+          if (isOwnProcess) {
+            this.restartController.recordRestartCompleted();
           }
 
           this.startHealthCheck();
@@ -455,7 +465,16 @@ export class GatewayManager extends EventEmitter {
     logger.info(`[gateway-refresh] mode=restart requested pidBefore=${pidBefore ?? 'n/a'}`);
     this.restartInFlight = (async () => {
       await this.stop();
-      await this.start();
+      try {
+        await this.start();
+      } catch (err) {
+        // stop() set shouldReconnect=false. Restore it so the gateway
+        // can self-heal via scheduleReconnect() instead of dying permanently.
+        logger.warn('Gateway restart: start() failed after stop(), enabling auto-reconnect recovery', err);
+        this.shouldReconnect = true;
+        this.scheduleReconnect();
+        throw err;
+      }
     })();
 
     try {
@@ -784,8 +803,19 @@ export class GatewayManager extends EventEmitter {
 
         if (this.status.state === 'running') {
           this.setStatus({ state: 'stopped' });
-          this.scheduleReconnect();
         }
+
+        // Always attempt reconnect from process exit.  scheduleReconnect()
+        // internally checks shouldReconnect and reconnect-timer guards, so
+        // calling it unconditionally is safe — intentional stop() calls set
+        // shouldReconnect=false which makes scheduleReconnect() no-op.
+        //
+        // On Windows, the WS close handler intentionally skips reconnect
+        // (to avoid racing with this exit handler).  However, WS close
+        // fires *before* process exit and sets state='stopped', which
+        // previously caused this handler to also skip reconnect — leaving
+        // the gateway permanently dead with no recovery path.
+        this.scheduleReconnect();
       },
       onError: () => {
         this.ownsProcess = false;

@@ -233,6 +233,28 @@ const AUTH_PROFILE_PROVIDER_KEY_MAP: Record<string, string> = {
 };
 
 /**
+ * Reverse of AUTH_PROFILE_PROVIDER_KEY_MAP.
+ * Maps a UI provider key (e.g. "openai") to all raw auth-profile provider
+ * keys that normalise to it (e.g. ["openai-codex"]).
+ */
+const AUTH_PROFILE_PROVIDER_KEY_REVERSE_MAP: Record<string, string[]> = Object.entries(
+  AUTH_PROFILE_PROVIDER_KEY_MAP,
+).reduce<Record<string, string[]>>((acc, [raw, normalized]) => {
+  if (!acc[normalized]) acc[normalized] = [];
+  acc[normalized].push(raw);
+  return acc;
+}, {});
+
+/**
+ * Return all raw auth-profile `provider` values that should be treated as
+ * equivalent to `provider` when cleaning up auth-profile entries.
+ * Always includes the provider itself.
+ */
+function expandProviderKeysForDeletion(provider: string): string[] {
+  return [provider, ...(AUTH_PROFILE_PROVIDER_KEY_REVERSE_MAP[provider] ?? [])];
+}
+
+/**
  * Scan OpenClaw's bundled extensions directory to find all plugins that have
  * `enabledByDefault: true` in their `openclaw.plugin.json` manifest.
  *
@@ -490,12 +512,23 @@ export async function removeProviderKeyFromOpenClaw(
  * Remove a provider completely from OpenClaw (delete config, disable plugins, delete keys)
  */
 export async function removeProviderFromOpenClaw(provider: string): Promise<void> {
-  // 1. Remove from auth-profiles.json
+  // 1. Remove from auth-profiles.json.
+  // We must also remove entries whose raw `provider` field maps to this UI
+  // provider key via AUTH_PROFILE_PROVIDER_KEY_MAP (e.g. "openai-codex" → "openai").
+  // If those entries survive, getProvidersFromAuthProfileStores() will re-add
+  // the provider and trigger a re-seed loop in listAccounts().
+  const providerKeysToRemove = expandProviderKeysForDeletion(provider);
   const agentIds = await discoverAgentIds();
   if (agentIds.length === 0) agentIds.push('main');
   for (const id of agentIds) {
     const store = await readAuthProfiles(id);
-    if (removeProfilesForProvider(store, provider)) {
+    let storeModified = false;
+    for (const key of providerKeysToRemove) {
+      if (removeProfilesForProvider(store, key)) {
+        storeModified = true;
+      }
+    }
+    if (storeModified) {
       await writeAuthProfiles(store, id);
     }
   }
@@ -553,8 +586,11 @@ export async function removeProviderFromOpenClaw(provider: string): Promise<void
           : null
       );
       if (authProfiles) {
+        // Also clean up raw auth-profile provider keys that map to this provider
+        // (e.g. "openai-codex" is stored as-is but maps to "openai" in the UI).
+        const providerKeysToClean = new Set(expandProviderKeysForDeletion(provider));
         for (const [profileId, profile] of Object.entries(authProfiles)) {
-          if (profile?.provider !== provider) {
+          if (!providerKeysToClean.has(profile?.provider)) {
             continue;
           }
           delete authProfiles[profileId];
@@ -1737,30 +1773,54 @@ export async function sanitizeOpenClawConfig(): Promise<void> {
       }
     }
 
-    // ── channels default-account migration ─────────────────────────
-    // Most OpenClaw channel plugins read the default account's credentials
-    // from the top level of `channels.<type>` (e.g. channels.feishu.appId),
-    // but ClawX historically stored them only under `channels.<type>.accounts.default`.
-    // Mirror the default account credentials at the top level so plugins can
-    // discover them.
+    // ── channels default-account migration and cleanup ─────────────
+    // Most OpenClaw channel plugins/built-ins read the default account's
+    // credentials from the top level of `channels.<type>`.  Mirror them
+    // there so the runtime can discover them.
+    //
+    // Strict-schema channels (e.g. dingtalk, additionalProperties:false)
+    // reject the `accounts` / `defaultAccount` keys entirely — strip them
+    // so the Gateway doesn't crash on startup.
     const channelsObj = config.channels as Record<string, Record<string, unknown>> | undefined;
+    const CHANNELS_EXCLUDING_TOP_LEVEL_MIRROR = new Set(['dingtalk']);
+
     if (channelsObj && typeof channelsObj === 'object') {
       for (const [channelType, section] of Object.entries(channelsObj)) {
         if (!section || typeof section !== 'object') continue;
-        const accounts = section.accounts as Record<string, Record<string, unknown>> | undefined;
-        const defaultAccount = accounts?.default;
-        if (!defaultAccount || typeof defaultAccount !== 'object') continue;
-        // Mirror each missing key from accounts.default to the top level
-        let mirrored = false;
-        for (const [key, value] of Object.entries(defaultAccount)) {
-          if (!(key in section)) {
-            section[key] = value;
-            mirrored = true;
+
+        if (CHANNELS_EXCLUDING_TOP_LEVEL_MIRROR.has(channelType)) {
+          // Strict-schema channel: strip `accounts` and `defaultAccount`.
+          // Credentials should live flat at the channel root.
+          if ('accounts' in section) {
+            delete section['accounts'];
+            modified = true;
+            console.log(`[sanitize] Removed incompatible 'accounts' from channels.${channelType}`);
           }
-        }
-        if (mirrored) {
-          modified = true;
-          console.log(`[sanitize] Mirrored ${channelType} default account credentials to top-level channels.${channelType}`);
+          if ('defaultAccount' in section) {
+            delete section['defaultAccount'];
+            modified = true;
+            console.log(`[sanitize] Removed incompatible 'defaultAccount' from channels.${channelType}`);
+          }
+        } else {
+          // Normal channel: mirror missing keys from default account to top level.
+          const accounts = section.accounts as Record<string, Record<string, unknown>> | undefined;
+          const defaultAccountId =
+            typeof section.defaultAccount === 'string' && section.defaultAccount.trim()
+                ? section.defaultAccount
+                : 'default';
+          const defaultAccountData = accounts?.[defaultAccountId] ?? accounts?.['default'];
+          if (!defaultAccountData || typeof defaultAccountData !== 'object') continue;
+          let mirrored = false;
+          for (const [key, value] of Object.entries(defaultAccountData)) {
+            if (!(key in section)) {
+              section[key] = value;
+              mirrored = true;
+            }
+          }
+          if (mirrored) {
+            modified = true;
+            console.log(`[sanitize] Mirrored ${channelType} default account credentials to top-level channels.${channelType}`);
+          }
         }
       }
     }
